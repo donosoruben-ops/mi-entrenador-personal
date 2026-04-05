@@ -486,6 +486,14 @@
             </div>
         </div>
 
+        <div id="aiInsightSection" class="hidden bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-4 mb-4 shadow-lg">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-bold text-blue-700"><i class="fas fa-robot mr-1"></i>🧠 Análisis IA de la Semana Anterior</h3>
+                <button onclick="document.getElementById('aiInsightSection').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xs px-2 py-1 rounded hover:bg-white">✕ Cerrar</button>
+            </div>
+            <div id="aiInsightContent" class="text-xs text-gray-700 space-y-2"></div>
+        </div>
+
         <div id="workoutContainer" class="week-scroll"></div>
     </div>
     </div>
@@ -1345,26 +1353,55 @@
         }
 
         // Workout Generation
-        function generateWeeklyPlan() {
+        function generateWeeklyPlan(context) {
+            const ctx = context || {};
+            const avoid = ctx.previousExercises || [];
+            const priorities = ctx.priorities || {};
+            const musclePerf = ctx.musclePerformance || {};
+
+            let monCount = 7, wedCount = 7, friCount = 7;
+
+            if (priorities.armFocus || (musclePerf.biceps && musclePerf.biceps.count > 0 && musclePerf.biceps.avgPct < 40)) {
+                monCount = 8;
+            }
+            if (priorities.legFocus || (musclePerf.legs && musclePerf.legs.count > 0 && musclePerf.legs.avgPct < 40)) {
+                friCount = 8;
+            }
+            if (priorities.fatLoss || (ctx.nutritionContext && ctx.nutritionContext.fatTrend === 'up')) {
+                wedCount = 8;
+            }
+            if (priorities.muscleGain || (ctx.nutritionContext && ctx.nutritionContext.muscleTrend === 'down')) {
+                monCount = Math.max(monCount, 8);
+                friCount = Math.max(friCount, 8);
+            }
+
             weeklyPlan = {
-                monday: generateDayPlan('biceps', 'triceps', 7),
-                tuesday: generateShortPlan(),
-                wednesday: generateDayPlan('chest', 'back', 7),
-                thursday: generateShortPlan(),
-                friday: generateDayPlan('legs', 'shoulders', 7),
-                saturday: generateShortPlan()
+                monday: generateDayPlan('biceps', 'triceps', monCount, avoid),
+                tuesday: generateShortPlan(avoid),
+                wednesday: generateDayPlan('chest', 'back', wedCount, avoid),
+                thursday: generateShortPlan(avoid),
+                friday: generateDayPlan('legs', 'shoulders', friCount, avoid),
+                saturday: generateShortPlan(avoid)
             };
             
             saveWeeklyPlan();
             updatePlanInfo();
         }
 
-        function generateDayPlan(muscle1, muscle2, totalExercises) {
+        function generateDayPlan(muscle1, muscle2, totalExercises, avoidNames) {
+            const avoid = avoidNames || [];
             const exercises = [];
-            const muscle1Exercises = shuffleArray([...exerciseDatabase[muscle1]]);
+
+            function prioritizeShuffle(arr) {
+                const unused = shuffleArray(arr.filter(e => !avoid.includes(e.name)));
+                const used = shuffleArray(arr.filter(e => avoid.includes(e.name)));
+                return [...unused, ...used];
+            }
+
+            const muscle1Exercises = prioritizeShuffle([...exerciseDatabase[muscle1]]);
             
             if (muscle2) {
-                const muscle2Exercises = shuffleArray([...exerciseDatabase[muscle2]]);
+                const muscle2Exercises = prioritizeShuffle([...exerciseDatabase[muscle2]]);
                 const exercisesPerMuscle = Math.floor(totalExercises / 2);
                 
                 for (let i = 0; i < exercisesPerMuscle; i++) {
@@ -1396,11 +1433,19 @@
             return shuffleArray(exercises);
         }
 
-        function generateShortPlan() {
+        function generateShortPlan(avoidNames) {
+            const avoid = avoidNames || [];
             const exercises = [];
-            const chestEx = shuffleArray([...exerciseDatabase.chest])[0];
-            const bicepsEx = shuffleArray([...exerciseDatabase.biceps])[0];
-            const tricepsEx = shuffleArray([...exerciseDatabase.triceps])[0];
+
+            function pickBest(arr) {
+                const unused = shuffleArray(arr.filter(e => !avoid.includes(e.name)));
+                const used = shuffleArray(arr.filter(e => avoid.includes(e.name)));
+                return [...unused, ...used][0];
+            }
+
+            const chestEx = pickBest([...exerciseDatabase.chest]);
+            const bicepsEx = pickBest([...exerciseDatabase.biceps]);
+            const tricepsEx = pickBest([...exerciseDatabase.triceps]);
             
             exercises.push({
                 ...chestEx,
@@ -2840,13 +2885,271 @@
             `;
         }
 
+        function collectWeeklySummary() {
+            const weekKeys = getWeekDateKeys();
+            const muscleGroups = ['biceps', 'triceps', 'chest', 'back', 'legs', 'shoulders'];
+            const summary = {
+                musclePerformance: {},
+                exerciseHistory: [],
+                daysCompleted: 0,
+                totalDays: 0,
+                overallWeightsPct: 0,
+                crossfitAvgPct: 0,
+                crossfitDaysWithData: 0
+            };
+
+            muscleGroups.forEach(m => {
+                summary.musclePerformance[m] = { totalPct: 0, count: 0, avgPct: 0, exercises: [] };
+            });
+
+            if (!weeklyPlan) return summary;
+
+            const planMap = {
+                1: weeklyPlan.monday || [],
+                2: weeklyPlan.tuesday || [],
+                3: weeklyPlan.wednesday || [],
+                4: weeklyPlan.thursday || [],
+                5: weeklyPlan.friday || [],
+                6: weeklyPlan.saturday || [],
+                0: []
+            };
+
+            const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+            let totalWeightsPct = 0, weightsDays = 0;
+
+            for (let i = 0; i < 7; i++) {
+                const dayIdx = dayOrder[i];
+                const dk = weekKeys[i];
+                const exercises = planMap[dayIdx] || [];
+
+                if (exercises.length > 0) {
+                    summary.totalDays++;
+                    const dayPct = calcDayPct(dk, exercises.length);
+                    if (dayPct > 0) summary.daysCompleted++;
+                    totalWeightsPct += dayPct;
+                    weightsDays++;
+
+                    exercises.forEach((ex, idx) => {
+                        const prog = getExerciseProgress(dk, idx);
+                        const pct = calcExercisePct(prog);
+                        const muscle = ex.muscle;
+
+                        if (muscle && summary.musclePerformance[muscle]) {
+                            summary.musclePerformance[muscle].totalPct += pct;
+                            summary.musclePerformance[muscle].count++;
+                            summary.musclePerformance[muscle].exercises.push({
+                                name: ex.name, pct: pct,
+                                weight: prog.doneWeight || prog.goalWeight
+                            });
+                        }
+                        summary.exerciseHistory.push(ex.name);
+                    });
+                }
+
+                if (crossfitProgress[dk]) {
+                    let cfTotal = 0, cfCount = 0;
+                    for (let j = 0; j < 10; j++) {
+                        const r = getCrossfitRow(dk, j);
+                        if (r.name && r.pct) {
+                            cfTotal += parseFloat(r.pct) || 0;
+                            cfCount++;
+                        }
+                    }
+                    if (cfCount > 0) {
+                        summary.crossfitDaysWithData++;
+                        summary.crossfitAvgPct += Math.round(cfTotal / cfCount);
+                    }
+                }
+            }
+
+            muscleGroups.forEach(m => {
+                const mp = summary.musclePerformance[m];
+                mp.avgPct = mp.count > 0 ? Math.round(mp.totalPct / mp.count) : 0;
+            });
+
+            summary.overallWeightsPct = weightsDays > 0 ? Math.round(totalWeightsPct / weightsDays) : 0;
+            if (summary.crossfitDaysWithData > 0) {
+                summary.crossfitAvgPct = Math.round(summary.crossfitAvgPct / summary.crossfitDaysWithData);
+            }
+
+            return summary;
+        }
+
+        function getNutritionContext() {
+            const sortedDates = Object.keys(nutritionRecords)
+                .filter(k => nutritionRecords[k]?.analysis || nutritionRecords[k]?.measuresSaved)
+                .sort();
+
+            if (sortedDates.length === 0) return { hasData: false };
+
+            const latestKey = sortedDates[sortedDates.length - 1];
+            const record = nutritionRecords[latestKey];
+            const manual = record.manual || {};
+
+            return {
+                hasData: true,
+                date: latestKey,
+                fatTrend: manual.fatPctDir || manual.fatKgDir || '',
+                muscleTrend: manual.musclePctDir || manual.muscleKgDir || '',
+                fatPct: manual.fatPct || record.analysis?.fatPct || null,
+                musclePct: manual.musclePct || record.analysis?.musclePct || null,
+                fatKg: manual.fatKg || record.analysis?.fatKg || null,
+                muscleKg: manual.muscleKg || record.analysis?.muscleKg || null
+            };
+        }
+
+        function parseObjectivePriorities(objectivesText) {
+            const text = (objectivesText || '').toLowerCase();
+            const priorities = {
+                fatLoss: false, muscleGain: false,
+                armFocus: false, legFocus: false,
+                endurance: false, strength: false
+            };
+
+            if (/baj(ar|a)\s*(de\s*)?(grasa|peso|kilo)|definir|definici|quemar/.test(text)) priorities.fatLoss = true;
+            if (/gan(ar|a)\s*(m[uú]sculo|masa)|hipertrofia|volumen/.test(text)) priorities.muscleGain = true;
+            if (/brazo|b[ií]cep|tr[ií]cep/.test(text)) priorities.armFocus = true;
+            if (/pierna|cu[aá]dricep|gl[uú]teo/.test(text)) priorities.legFocus = true;
+            if (/resistencia|cardio|aguante/.test(text)) priorities.endurance = true;
+            if (/fuerza|pesado|m[aá]ximo|potencia/.test(text)) priorities.strength = true;
+
+            return priorities;
+        }
+
+        function resetCurrentWeekProgress() {
+            const weekKeys = getWeekDateKeys();
+            weekKeys.forEach(dk => {
+                if (workoutProgress[dk]) delete workoutProgress[dk];
+                if (crossfitProgress[dk]) delete crossfitProgress[dk];
+            });
+            saveWorkoutProgress();
+            saveCrossfitProgress();
+        }
+
+        function buildAIInsightMessage(summary, nutritionCtx, objectives) {
+            const muscleLabels = {
+                biceps: 'Bíceps', triceps: 'Tríceps', chest: 'Pecho',
+                back: 'Espalda', legs: 'Piernas', shoulders: 'Hombros'
+            };
+
+            let html = '';
+
+            html += '<div class="bg-white rounded p-2 border border-blue-100">';
+            html += '<p class="font-bold text-blue-800 text-xs mb-1">📊 Resumen Semana Anterior</p>';
+            html += '<p class="text-[11px]">Días completados: <strong>' + summary.daysCompleted + '/' + summary.totalDays + '</strong> | Promedio pesas: <strong>' + summary.overallWeightsPct + '%</strong>';
+            if (summary.crossfitDaysWithData > 0) {
+                html += ' | CrossFit promedio: <strong>' + summary.crossfitAvgPct + '%</strong>';
+            }
+            html += '</p>';
+
+            const muscleRows = Object.entries(summary.musclePerformance)
+                .filter(([_, mp]) => mp.count > 0)
+                .map(([m, mp]) => {
+                    const color = mp.avgPct >= 80 ? 'text-emerald-600' : mp.avgPct >= 50 ? 'text-amber-600' : 'text-red-600';
+                    return '<span class="' + color + ' font-semibold">' + muscleLabels[m] + ': ' + mp.avgPct + '%</span>';
+                }).join(' | ');
+
+            if (muscleRows) {
+                html += '<p class="text-[11px] mt-1">' + muscleRows + '</p>';
+            }
+            html += '</div>';
+
+            if (objectives.text) {
+                html += '<div class="bg-white rounded p-2 border border-green-100 mt-2">';
+                html += '<p class="font-bold text-green-800 text-xs mb-1">🎯 Objetivos del Atleta</p>';
+                html += '<p class="text-[11px] text-gray-700">' + objectives.text + '</p>';
+
+                const priorities = parseObjectivePriorities(objectives.text);
+                const activeP = [];
+                if (priorities.fatLoss) activeP.push('🔥 Quema de grasa → más ejercicios compuestos');
+                if (priorities.muscleGain) activeP.push('💪 Ganancia muscular → mayor volumen');
+                if (priorities.armFocus) activeP.push('💪 Foco en brazos → ejercicios adicionales bíceps/tríceps');
+                if (priorities.legFocus) activeP.push('🦵 Foco en piernas → ejercicios adicionales tren inferior');
+                if (priorities.endurance) activeP.push('🏃 Resistencia → series más largas');
+                if (priorities.strength) activeP.push('🏋️ Fuerza → cargas pesadas');
+
+                if (activeP.length > 0) {
+                    html += '<p class="text-[10px] text-green-700 mt-1">IA detectó: ' + activeP.join(' · ') + '</p>';
+                }
+                html += '</div>';
+            }
+
+            if (nutritionCtx.hasData) {
+                html += '<div class="bg-white rounded p-2 border border-sky-100 mt-2">';
+                html += '<p class="font-bold text-sky-800 text-xs mb-1">🥗 Factores Nutricionales</p>';
+                const nutInfo = [];
+                if (nutritionCtx.fatTrend === 'up') nutInfo.push('⚠️ Grasa subió → más compuestos y cardio');
+                if (nutritionCtx.fatTrend === 'down') nutInfo.push('✅ Grasa bajó → mantener rutina');
+                if (nutritionCtx.muscleTrend === 'up') nutInfo.push('✅ Músculo subió → progresión de cargas');
+                if (nutritionCtx.muscleTrend === 'down') nutInfo.push('⚠️ Músculo bajó → más volumen y proteína');
+                if (nutritionCtx.fatPct) nutInfo.push('Grasa: ' + nutritionCtx.fatPct + '%');
+                if (nutritionCtx.musclePct) nutInfo.push('Músculo: ' + nutritionCtx.musclePct + '%');
+
+                html += '<p class="text-[11px] text-gray-700">' + (nutInfo.length > 0 ? nutInfo.join(' · ') : 'Datos nutricionales disponibles') + '</p>';
+                html += '</div>';
+            }
+
+            html += '<div class="bg-white rounded p-2 border border-purple-100 mt-2">';
+            html += '<p class="font-bold text-purple-800 text-xs mb-1">🤖 Decisiones de la IA para esta semana</p>';
+
+            const decisions = [];
+            const weakMuscles = Object.entries(summary.musclePerformance)
+                .filter(([_, mp]) => mp.count > 0 && mp.avgPct < 50)
+                .map(([m]) => muscleLabels[m]);
+            const strongMuscles = Object.entries(summary.musclePerformance)
+                .filter(([_, mp]) => mp.count > 0 && mp.avgPct >= 80)
+                .map(([m]) => muscleLabels[m]);
+
+            if (weakMuscles.length > 0) {
+                decisions.push('Ejercicios nuevos para ' + weakMuscles.join(', ') + ' (rendimiento bajo la semana pasada)');
+            }
+            if (strongMuscles.length > 0) {
+                decisions.push('Progresión en ' + strongMuscles.join(', ') + ' (buen rendimiento → nuevos desafíos)');
+            }
+            if (decisions.length === 0) {
+                decisions.push('Plan variado con rotación de ejercicios para estimulación muscular óptima');
+            }
+            decisions.push('✅ Todos los porcentajes de pesas y CrossFit se reiniciaron a 0% para la nueva semana');
+
+            html += '<ul class="text-[11px] text-gray-700 list-disc ml-3">' + decisions.map(d => '<li>' + d + '</li>').join('') + '</ul>';
+            html += '</div>';
+
+            return html;
+        }
+
         function generateNewWeek() {
+            const summary = collectWeeklySummary();
+            const nutritionCtx = getNutritionContext();
+            const objectives = athleteObjectives;
+            const priorities = parseObjectivePriorities(objectives.text);
+
+            const context = {
+                previousExercises: summary.exerciseHistory,
+                priorities: priorities,
+                musclePerformance: summary.musclePerformance,
+                nutritionContext: nutritionCtx
+            };
+
+            const insightHtml = buildAIInsightMessage(summary, nutritionCtx, objectives);
+            const insightSection = document.getElementById('aiInsightSection');
+            const insightContent = document.getElementById('aiInsightContent');
+            if (insightSection && insightContent) {
+                insightContent.innerHTML = insightHtml;
+                insightSection.classList.remove('hidden');
+            }
+
+            resetCurrentWeekProgress();
+
             currentWeekNumber++;
             saveWeekNumber();
-            generateWeeklyPlan();
+            generateWeeklyPlan(context);
+
             renderTodayWorkout();
             renderWeeklyWorkouts();
-            alert('✅ Nueva semana generada con ejercicios diferentes!');
+
+            if (insightSection) {
+                insightSection.scrollIntoView({ behavior: 'smooth' });
+            }
         }
 
         function updatePlanInfo() {
