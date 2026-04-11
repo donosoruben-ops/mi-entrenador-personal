@@ -353,9 +353,271 @@
         .body-zone {
             transition: fill 0.25s ease;
         }
+        /* Auth & Multi-user Screens */
+        .auth-screen, .admin-screen, .profile-screen, .consult-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #fef9c3 0%, #fde68a 45%, #fbbf24 100%);
+        }
+        .auth-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+        }
+        .admin-screen, .profile-screen, .consult-screen {
+            align-items: flex-start;
+            padding: 20px 0;
+        }
+        .admin-card, .profile-card, .consult-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            padding: 24px;
+            max-width: 800px;
+            width: 95%;
+            margin: 0 auto;
+        }
+        .user-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        .user-row:hover { border-color: #f59e0b; background: #fffbeb; }
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #f59e0b;
+            background: #f3f4f6;
+        }
+        .user-avatar-sm {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #f59e0b;
+            background: #f3f4f6;
+        }
+        .avatar-upload-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 4px dashed #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.3s;
+            background: #f8fafc;
+        }
+        .avatar-upload-circle:hover { border-color: #f59e0b; background: #fffbeb; }
+        .avatar-upload-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-active { background: #dcfce7; color: #166534; }
+        .status-expired { background: #fee2e2; color: #991b1b; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 2px solid #e2e8f0;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 12px;
+            z-index: 9998;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+        }
+        .bottom-nav button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .bottom-nav button.active { color: #d97706; background: #fffbeb; }
+        .bottom-nav button i { font-size: 18px; }
+        .app-section { display: none; }
+        .app-section.active { display: block; }
+        body.authenticated { padding-bottom: 60px; }
     </style>
 </head>
 <body class="p-0">
+
+    <!-- ========== LOGIN SCREEN ========== -->
+    <div id="screenLogin" class="auth-screen">
+        <div class="auth-card text-center">
+            <h1 class="text-4xl font-bold text-amber-900 mb-1">🏋️ Boxi</h1>
+            <p class="text-amber-700 text-sm mb-6">Entrenamiento y Nutrición Personalizada</p>
+
+            <div id="loginUserList" class="space-y-2 mb-4"></div>
+
+            <button onclick="showScreen('screenRegister')" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl transition-all text-sm">
+                <i class="fas fa-user-plus mr-2"></i>Crear mi perfil
+            </button>
+
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <button onclick="loginAsAdmin()" class="text-xs text-gray-500 hover:text-amber-700 underline">
+                    <i class="fas fa-lock mr-1"></i>Acceso Administrador
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== REGISTER SCREEN ========== -->
+    <div id="screenRegister" class="auth-screen" style="display:none;">
+        <div class="auth-card">
+            <button onclick="showScreen('screenLogin')" class="text-gray-400 hover:text-gray-600 text-sm mb-4"><i class="fas fa-arrow-left mr-1"></i>Volver</button>
+            <h2 class="text-2xl font-bold text-amber-900 mb-1 text-center">Crear Perfil</h2>
+            <p class="text-gray-500 text-xs text-center mb-6">Completa tu información básica para comenzar</p>
+
+            <div class="flex justify-center mb-5">
+                <div class="avatar-upload-circle" id="registerAvatarCircle" onclick="document.getElementById('registerPhotoInput').click()">
+                    <span id="registerAvatarPlaceholder" class="text-3xl text-gray-300"><i class="fas fa-camera"></i></span>
+                </div>
+                <input type="file" id="registerPhotoInput" accept="image/*" class="hidden">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre completo</label>
+                <input type="text" id="registerName" placeholder="Ej: María González" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-amber-400 focus:outline-none transition-all">
+            </div>
+
+            <button onclick="registerUser()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl transition-all text-sm">
+                <i class="fas fa-check mr-2"></i>Crear mi perfil
+            </button>
+            <p id="registerError" class="text-red-500 text-xs text-center mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <!-- ========== ADMIN PASSWORD SCREEN ========== -->
+    <div id="screenAdminLogin" class="auth-screen" style="display:none;">
+        <div class="auth-card text-center">
+            <button onclick="showScreen('screenLogin')" class="text-gray-400 hover:text-gray-600 text-sm mb-4 block text-left"><i class="fas fa-arrow-left mr-1"></i>Volver</button>
+            <h2 class="text-2xl font-bold text-amber-900 mb-1"><i class="fas fa-shield-halved mr-2"></i>Admin</h2>
+            <p class="text-gray-500 text-xs mb-6">Ingresa la clave de administrador</p>
+            <input type="password" id="adminPassInput" placeholder="Clave admin" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm text-center focus:border-amber-400 focus:outline-none mb-3">
+            <button onclick="verifyAdminPass()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl transition-all text-sm">
+                <i class="fas fa-sign-in-alt mr-2"></i>Entrar como Admin
+            </button>
+            <p id="adminLoginError" class="text-red-500 text-xs mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <!-- ========== ADMIN PANEL ========== -->
+    <div id="screenAdmin" class="admin-screen" style="display:none;">
+        <div class="admin-card">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-red-700"><i class="fas fa-user-shield mr-2"></i>Panel Admin</h2>
+                    <p class="text-gray-500 text-xs">Gestión de usuarios y autorizaciones</p>
+                </div>
+                <button onclick="logoutUser()" class="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg text-gray-700 font-semibold"><i class="fas fa-sign-out-alt mr-1"></i>Salir</button>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <h3 class="font-bold text-amber-800 text-sm mb-1"><i class="fas fa-key mr-1"></i>Cambiar clave admin</h3>
+                <div class="flex gap-2 items-center">
+                    <input type="password" id="newAdminPass" placeholder="Nueva clave" class="flex-1 border border-amber-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500">
+                    <button onclick="changeAdminPass()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-4 py-2 rounded-lg font-semibold">Guardar</button>
+                </div>
+            </div>
+
+            <h3 class="font-bold text-gray-700 text-sm mb-3"><i class="fas fa-users mr-2"></i>Usuarios registrados</h3>
+            <div id="adminUserList" class="space-y-2 mb-4"></div>
+
+            <div class="mt-6 pt-4 border-t border-gray-200">
+                <button onclick="enterAppAsAdmin()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl transition-all text-sm">
+                    <i class="fas fa-dumbbell mr-2"></i>Ir a Boxi como mi propio usuario
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== USER PROFILE SCREEN ========== -->
+    <div id="screenProfile" class="profile-screen app-section" style="display:none;">
+        <div class="profile-card">
+            <h2 class="text-2xl font-bold text-amber-900 mb-4 text-center"><i class="fas fa-id-card mr-2"></i>Mi Perfil</h2>
+            <div class="flex flex-col items-center mb-5">
+                <div class="avatar-upload-circle mb-3" id="profileAvatarCircle" onclick="document.getElementById('profilePhotoInput').click()">
+                    <span id="profileAvatarPlaceholder" class="text-3xl text-gray-300"><i class="fas fa-camera"></i></span>
+                </div>
+                <input type="file" id="profilePhotoInput" accept="image/*" class="hidden">
+                <p class="text-xs text-gray-400">Toca para cambiar foto</p>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre completo</label>
+                    <input type="text" id="profileName" class="w-full border-2 border-gray-200 rounded-xl px-4 py-2 text-sm focus:border-amber-400 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                        <p class="text-xs text-amber-700 font-semibold">Miembro desde</p>
+                        <p id="profileSince" class="text-lg font-bold text-amber-900">-</p>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                        <p class="text-xs text-green-700 font-semibold">Estado</p>
+                        <p id="profileStatus" class="text-lg font-bold">-</p>
+                    </div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <p class="text-xs text-blue-700 font-semibold">Autorización vigente</p>
+                    <p id="profileAuthDates" class="text-sm font-bold text-blue-900">-</p>
+                </div>
+            </div>
+            <button onclick="saveProfileChanges()" class="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-sm"><i class="fas fa-save mr-2"></i>Guardar cambios</button>
+        </div>
+    </div>
+
+    <!-- ========== CONSULTATION SCREEN ========== -->
+    <div id="screenConsult" class="consult-screen app-section" style="display:none;">
+        <div class="consult-card">
+            <h2 class="text-2xl font-bold text-purple-800 mb-4 text-center"><i class="fas fa-comments mr-2"></i>Consultas</h2>
+            <p class="text-gray-500 text-xs text-center mb-4">Envía consultas a tu entrenador</p>
+            <div id="consultMessages" class="space-y-3 mb-4 max-h-[50vh] overflow-y-auto"></div>
+            <div class="flex gap-2">
+                <textarea id="consultInput" rows="2" placeholder="Escribe tu consulta..." class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-2 text-sm focus:border-purple-400 focus:outline-none resize-none"></textarea>
+                <button onclick="sendConsult()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 rounded-xl font-bold text-sm"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MAIN APP (authenticated) ========== -->
+    <div id="screenApp" class="app-section" style="display:none;">
+
     <!-- Fixed Clock Widget -->
     <div class="clock-widget" id="clockWidget">
         <div class="digital-clock" id="digitalClock">00:00:00</div>
@@ -373,9 +635,12 @@
     <div style="background: linear-gradient(135deg, #fef9c3 0%, #fde68a 45%, #fbbf24 100%);" class="p-4 pb-6">
     <div class="max-w-6xl mx-auto">
         <div class="text-center mb-6">
-            <h1 class="text-4xl font-bold text-amber-900 mb-1">🏋️ Boxi</h1>
+            <div class="flex items-center justify-center gap-3 mb-1">
+                <img id="appUserAvatar" src="" class="user-avatar-sm" style="display:none;" alt="avatar">
+                <h1 class="text-4xl font-bold text-amber-900">🏋️ Boxi</h1>
+            </div>
             <p class="text-amber-800 text-base font-semibold">Tu plan de entrenamiento y nutrición</p>
-            <p class="text-amber-700 text-sm mt-1">👤 Ruben</p>
+            <p class="text-amber-700 text-sm mt-1" id="appUserGreeting">👤 Usuario</p>
         </div>
 
         <!-- Training Mode Selector -->
@@ -615,6 +880,16 @@
             <p>🏋️ ¡Constancia + Disciplina = Resultados! 🏋️</p>
         </div>
     </div>
+    </div>
+
+    </div><!-- /screenApp -->
+
+    <!-- ========== BOTTOM NAVIGATION (authenticated users) ========== -->
+    <div id="bottomNav" class="bottom-nav" style="display:none;">
+        <button onclick="switchTab('screenApp')" id="navHome" class="active"><i class="fas fa-dumbbell"></i>Inicio</button>
+        <button onclick="switchTab('screenProfile')" id="navProfile"><i class="fas fa-user-circle"></i>Perfil</button>
+        <button onclick="switchTab('screenConsult')" id="navConsult"><i class="fas fa-comments"></i>Consultas</button>
+        <button onclick="logoutUser()" id="navLogout"><i class="fas fa-sign-out-alt"></i>Salir</button>
     </div>
 
     <script>
@@ -1230,25 +1505,12 @@
             container.innerHTML = html;
         }
 
-        // Initialize App
+        // Initialize App — now controlled by auth system via reloadAppData()
         document.addEventListener('DOMContentLoaded', function() {
             if (window.pdfjsLib) {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
             }
-
-            loadTrainingSettings();
-            loadObjectives();
-            loadWeekNumber();
-            loadWorkoutProgress();
-            loadCrossfitProgress();
-            loadNutritionData();
-            setTrainingMode(trainingMode);
-            renderWeeklyDays();
-            generateWeeklyPlan();
-            renderCalendar();
-            renderTodayWorkout();
-            renderWeeklyWorkouts();
-            initNutritionModule();
+            // App data loading moved to reloadAppData() called after login
         });
 
         // Calendar Functions
@@ -1509,9 +1771,18 @@
             return nutritionRecords[dateKey];
         }
 
+        let nutritionModuleInitialized = false;
         function initNutritionModule() {
             nutritionSelectedDateKey = getDateKey(new Date());
             nutritionTimelineFocusDateKey = nutritionSelectedDateKey;
+
+            if (nutritionModuleInitialized) {
+                renderNutritionCalendar();
+                updateNutritionSelectedDayUI();
+                renderNutritionBodyTimeline();
+                return;
+            }
+            nutritionModuleInitialized = true;
 
             document.getElementById('nutritionPrevMonth').addEventListener('click', () => {
                 nutritionCurrentDate.setMonth(nutritionCurrentDate.getMonth() - 1);
@@ -3217,6 +3488,532 @@
         console.log('✅ App de Entrenamiento Personal Pro cargada');
         console.log('📱 Optimizada para móvil con calendario integrado');
         console.log('🔄 Sistema de rotación semanal activado');
+
+        // =============================================
+        // MULTI-USER AUTH SYSTEM
+        // =============================================
+        const ADMIN_ID = '__admin__';
+        const DEFAULT_ADMIN_PASS = 'boxi2026';
+        let currentUserId = null;
+        let isAdmin = false;
+        let registerPhotoData = null;
+        let profilePhotoData = null;
+
+        // Capture original localStorage methods before any patching
+        const originalGetItem = localStorage.getItem.bind(localStorage);
+        const originalSetItem = localStorage.setItem.bind(localStorage);
+        const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+        const perUserKeys = ['weeklyPlan','planDate','weekNumber','workoutProgress','crossfitProgress','nutritionRecords','trainingMode','weeklySchedule','athleteObjectives'];
+
+        function getBoxiUsers() {
+            try { return JSON.parse(originalGetItem('boxi_users') || '{}'); } catch(e) { return {}; }
+        }
+        function saveBoxiUsers(users) {
+            originalSetItem('boxi_users', JSON.stringify(users));
+        }
+        function getAdminPass() {
+            return originalGetItem('boxi_admin_pass') || DEFAULT_ADMIN_PASS;
+        }
+        function getConsults() {
+            try { return JSON.parse(originalGetItem('boxi_consults') || '[]'); } catch(e) { return []; }
+        }
+        function saveConsults(c) {
+            originalSetItem('boxi_consults', JSON.stringify(c));
+        }
+
+        function generateUserId() {
+            return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        }
+
+        function getUserStoragePrefix() {
+            return currentUserId ? `boxi_u_${currentUserId}_` : '';
+        }
+
+        // Per-user localStorage patching functions
+        function patchedGetItem(key) {
+            if (currentUserId && perUserKeys.includes(key)) {
+                return originalGetItem(getUserStoragePrefix() + key);
+            }
+            return originalGetItem(key);
+        }
+        function patchedSetItem(key, val) {
+            if (currentUserId && perUserKeys.includes(key)) {
+                return originalSetItem(getUserStoragePrefix() + key, val);
+            }
+            return originalSetItem(key, val);
+        }
+
+        function enableUserStorage() {
+            localStorage.getItem = patchedGetItem;
+            localStorage.setItem = patchedSetItem;
+        }
+        function disableUserStorage() {
+            localStorage.getItem = originalGetItem;
+            localStorage.setItem = originalSetItem;
+        }
+
+        // Screen management
+        function showScreen(screenId) {
+            const allScreens = ['screenLogin','screenRegister','screenAdminLogin','screenAdmin','screenProfile','screenConsult','screenApp'];
+            allScreens.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            const target = document.getElementById(screenId);
+            if (target) target.style.display = '';
+        }
+
+        function switchTab(tabId) {
+            ['screenApp','screenProfile','screenConsult'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.style.display = 'none'; el.classList.remove('active'); }
+            });
+            const target = document.getElementById(tabId);
+            if (target) { target.style.display = ''; target.classList.add('active'); }
+
+            document.querySelectorAll('#bottomNav button').forEach(btn => btn.classList.remove('active'));
+            const navMap = { screenApp: 'navHome', screenProfile: 'navProfile', screenConsult: 'navConsult' };
+            const navBtn = document.getElementById(navMap[tabId]);
+            if (navBtn) navBtn.classList.add('active');
+
+            if (tabId === 'screenProfile') renderProfileScreen();
+            if (tabId === 'screenConsult') renderConsultScreen();
+        }
+
+        // LOGIN SCREEN
+        function renderLoginScreen() {
+            const users = getBoxiUsers();
+            const list = document.getElementById('loginUserList');
+            const entries = Object.values(users);
+            if (entries.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-xs">No hay usuarios registrados aún</p>';
+                return;
+            }
+            list.innerHTML = entries.map(u => {
+                const authStatus = getUserAuthStatus(u);
+                const badge = authStatus === 'active' ? '<span class="status-badge status-active">Activo</span>'
+                    : authStatus === 'expired' ? '<span class="status-badge status-expired">Expirado</span>'
+                    : '<span class="status-badge status-pending">Pendiente</span>';
+                const avatarHtml = u.photo
+                    ? `<img src="${u.photo}" class="user-avatar" alt="${u.name}">`
+                    : `<div class="user-avatar flex items-center justify-center text-xl text-amber-600 font-bold">${u.name.charAt(0).toUpperCase()}</div>`;
+                return `<button onclick="loginAsUser('${u.id}')" class="user-row w-full text-left">
+                    ${avatarHtml}
+                    <div class="flex-1">
+                        <p class="font-bold text-gray-800 text-sm">${u.name}</p>
+                        ${badge}
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </button>`;
+            }).join('');
+        }
+
+        function getUserAuthStatus(user) {
+            if (!user.authStart || !user.authEnd) return 'pending';
+            const now = new Date();
+            const start = new Date(user.authStart);
+            const end = new Date(user.authEnd + 'T23:59:59');
+            if (now >= start && now <= end) return 'active';
+            return 'expired';
+        }
+
+        function loginAsUser(userId) {
+            const users = getBoxiUsers();
+            const user = users[userId];
+            if (!user) return;
+            const status = getUserAuthStatus(user);
+            if (status === 'expired') {
+                alert('Tu autorización ha expirado. Contacta al administrador.');
+                return;
+            }
+            if (status === 'pending') {
+                alert('Tu cuenta aún no ha sido autorizada. Contacta al administrador.');
+                return;
+            }
+            currentUserId = userId;
+            isAdmin = false;
+            enableUserStorage();
+            enterApp(user);
+        }
+
+        function loginAsAdmin() {
+            showScreen('screenAdminLogin');
+        }
+
+        function verifyAdminPass() {
+            const pass = document.getElementById('adminPassInput').value;
+            const errEl = document.getElementById('adminLoginError');
+            if (pass === getAdminPass()) {
+                errEl.classList.add('hidden');
+                document.getElementById('adminPassInput').value = '';
+                isAdmin = true;
+                renderAdminPanel();
+                showScreen('screenAdmin');
+            } else {
+                errEl.textContent = 'Clave incorrecta';
+                errEl.classList.remove('hidden');
+            }
+        }
+
+        function changeAdminPass() {
+            const newPass = document.getElementById('newAdminPass').value.trim();
+            if (newPass.length < 4) { alert('La clave debe tener al menos 4 caracteres'); return; }
+            originalSetItem('boxi_admin_pass', newPass);
+            document.getElementById('newAdminPass').value = '';
+            alert('Clave de admin actualizada');
+        }
+
+        // REGISTER
+        function setupRegisterPhoto() {
+            document.getElementById('registerPhotoInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    registerPhotoData = ev.target.result;
+                    document.getElementById('registerAvatarCircle').innerHTML = `<img src="${registerPhotoData}" alt="foto">`;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function registerUser() {
+            const name = document.getElementById('registerName').value.trim();
+            const errEl = document.getElementById('registerError');
+            if (!name) {
+                errEl.textContent = 'Ingresa tu nombre completo';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            const userId = generateUserId();
+            const users = getBoxiUsers();
+            users[userId] = {
+                id: userId,
+                name: name,
+                photo: registerPhotoData || null,
+                createdAt: new Date().toISOString(),
+                authStart: null,
+                authEnd: null
+            };
+            saveBoxiUsers(users);
+            registerPhotoData = null;
+            document.getElementById('registerName').value = '';
+            document.getElementById('registerAvatarCircle').innerHTML = '<span class="text-3xl text-gray-300"><i class="fas fa-camera"></i></span>';
+            errEl.classList.add('hidden');
+            alert('Perfil creado. El administrador debe autorizar tu acceso.');
+            renderLoginScreen();
+            showScreen('screenLogin');
+        }
+
+        // ADMIN PANEL
+        function renderAdminPanel() {
+            const users = getBoxiUsers();
+            const list = document.getElementById('adminUserList');
+            const entries = Object.values(users);
+            if (entries.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-xs text-center py-4">No hay usuarios registrados</p>';
+                return;
+            }
+            list.innerHTML = entries.map(u => {
+                const status = getUserAuthStatus(u);
+                const badge = status === 'active' ? '<span class="status-badge status-active">Activo</span>'
+                    : status === 'expired' ? '<span class="status-badge status-expired">Expirado</span>'
+                    : '<span class="status-badge status-pending">Pendiente</span>';
+                const avatarHtml = u.photo
+                    ? `<img src="${u.photo}" class="user-avatar" alt="${u.name}">`
+                    : `<div class="user-avatar flex items-center justify-center text-xl text-amber-600 font-bold">${u.name.charAt(0).toUpperCase()}</div>`;
+                return `<div class="user-row flex-wrap">
+                    ${avatarHtml}
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-gray-800 text-sm">${u.name}</p>
+                        <p class="text-[10px] text-gray-400">Desde: ${new Date(u.createdAt).toLocaleDateString('es-ES')}</p>
+                        ${badge}
+                    </div>
+                    <div class="flex flex-col gap-1 w-full sm:w-auto mt-2 sm:mt-0">
+                        <div class="flex items-center gap-1">
+                            <label class="text-[10px] text-gray-500 w-12">Inicio:</label>
+                            <input type="date" value="${u.authStart || ''}" onchange="updateUserAuth('${u.id}','authStart',this.value)" class="border border-gray-300 rounded px-2 py-1 text-xs">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <label class="text-[10px] text-gray-500 w-12">Fin:</label>
+                            <input type="date" value="${u.authEnd || ''}" onchange="updateUserAuth('${u.id}','authEnd',this.value)" class="border border-gray-300 rounded px-2 py-1 text-xs">
+                        </div>
+                        <button onclick="deleteUser('${u.id}')" class="text-[10px] text-red-500 hover:text-red-700 mt-1"><i class="fas fa-trash mr-1"></i>Eliminar</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function updateUserAuth(userId, field, value) {
+            const users = getBoxiUsers();
+            if (users[userId]) {
+                users[userId][field] = value || null;
+                saveBoxiUsers(users);
+                renderAdminPanel();
+            }
+        }
+
+        function deleteUser(userId) {
+            if (!confirm('¿Eliminar este usuario? Se perderán sus datos.')) return;
+            const users = getBoxiUsers();
+            delete users[userId];
+            saveBoxiUsers(users);
+            // Clean up user storage
+            const prefix = `boxi_u_${userId}_`;
+            const keysToDelete = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(prefix)) keysToDelete.push(key);
+            }
+            keysToDelete.forEach(k => originalRemoveItem(k));
+            renderAdminPanel();
+        }
+
+        function enterAppAsAdmin() {
+            // Admin enters as their own user — find or create admin user record
+            const users = getBoxiUsers();
+            let adminUser = Object.values(users).find(u => u.isAdminUser);
+            if (!adminUser) {
+                const adminUserId = 'admin_user';
+                adminUser = {
+                    id: adminUserId,
+                    name: 'Administrador',
+                    photo: null,
+                    createdAt: new Date().toISOString(),
+                    authStart: '2020-01-01',
+                    authEnd: '2099-12-31',
+                    isAdminUser: true
+                };
+                users[adminUserId] = adminUser;
+                saveBoxiUsers(users);
+            }
+            currentUserId = adminUser.id;
+            isAdmin = true;
+            enableUserStorage();
+            enterApp(adminUser);
+        }
+
+        // ENTER APP
+        function enterApp(user) {
+            document.body.classList.add('authenticated');
+            // Update greeting
+            const greetEl = document.getElementById('appUserGreeting');
+            if (greetEl) greetEl.textContent = `👤 ${user.name}`;
+            const avatarEl = document.getElementById('appUserAvatar');
+            if (avatarEl && user.photo) {
+                avatarEl.src = user.photo;
+                avatarEl.style.display = '';
+            } else if (avatarEl) {
+                avatarEl.style.display = 'none';
+            }
+
+            // Show bottom nav
+            document.getElementById('bottomNav').style.display = '';
+
+            // Show admin button in nav if admin
+            // Re-init the app with this user's data
+            reloadAppData();
+
+            showScreen('screenApp');
+            document.getElementById('screenApp').classList.add('active');
+        }
+
+        function reloadAppData() {
+            loadTrainingSettings();
+            loadObjectives();
+            loadWeekNumber();
+            loadWorkoutProgress();
+            loadCrossfitProgress();
+            loadNutritionData();
+            setTrainingMode(trainingMode);
+            renderWeeklyDays();
+            generateWeeklyPlan();
+            renderCalendar();
+            renderTodayWorkout();
+            renderWeeklyWorkouts();
+            initNutritionModule();
+        }
+
+        // PROFILE SCREEN
+        function renderProfileScreen() {
+            if (!currentUserId) return;
+            const users = getBoxiUsers();
+            const user = users[currentUserId];
+            if (!user) return;
+
+            document.getElementById('profileName').value = user.name;
+            const avatarCircle = document.getElementById('profileAvatarCircle');
+            if (user.photo) {
+                avatarCircle.innerHTML = `<img src="${user.photo}" alt="foto">`;
+                profilePhotoData = user.photo;
+            } else {
+                avatarCircle.innerHTML = `<span class="text-3xl text-gray-300"><i class="fas fa-camera"></i></span>`;
+                profilePhotoData = null;
+            }
+
+            const created = new Date(user.createdAt);
+            const now = new Date();
+            const months = (now.getFullYear() - created.getFullYear()) * 12 + (now.getMonth() - created.getMonth());
+            document.getElementById('profileSince').textContent = months <= 0 ? 'Este mes' : `${months} mes${months > 1 ? 'es' : ''}`;
+
+            const status = getUserAuthStatus(user);
+            const statusEl = document.getElementById('profileStatus');
+            if (status === 'active') { statusEl.textContent = 'Activo'; statusEl.className = 'text-lg font-bold text-green-700'; }
+            else if (status === 'expired') { statusEl.textContent = 'Expirado'; statusEl.className = 'text-lg font-bold text-red-700'; }
+            else { statusEl.textContent = 'Pendiente'; statusEl.className = 'text-lg font-bold text-amber-700'; }
+
+            const authDates = document.getElementById('profileAuthDates');
+            if (user.authStart && user.authEnd) {
+                authDates.textContent = `${new Date(user.authStart).toLocaleDateString('es-ES')} — ${new Date(user.authEnd).toLocaleDateString('es-ES')}`;
+            } else {
+                authDates.textContent = 'Sin autorización asignada';
+            }
+        }
+
+        function setupProfilePhoto() {
+            document.getElementById('profilePhotoInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    profilePhotoData = ev.target.result;
+                    document.getElementById('profileAvatarCircle').innerHTML = `<img src="${profilePhotoData}" alt="foto">`;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function saveProfileChanges() {
+            if (!currentUserId) return;
+            const users = getBoxiUsers();
+            const user = users[currentUserId];
+            if (!user) return;
+            const newName = document.getElementById('profileName').value.trim();
+            if (!newName) { alert('El nombre no puede estar vacío'); return; }
+            user.name = newName;
+            if (profilePhotoData) user.photo = profilePhotoData;
+            saveBoxiUsers(users);
+
+            // Update greeting
+            const greetEl = document.getElementById('appUserGreeting');
+            if (greetEl) greetEl.textContent = `👤 ${user.name}`;
+            const avatarEl = document.getElementById('appUserAvatar');
+            if (avatarEl && user.photo) { avatarEl.src = user.photo; avatarEl.style.display = ''; }
+
+            alert('Perfil actualizado');
+        }
+
+        // CONSULTATION SCREEN
+        function renderConsultScreen() {
+            const consults = getConsults();
+            const container = document.getElementById('consultMessages');
+            const userConsults = consults.filter(c => c.userId === currentUserId || (isAdmin));
+            if (userConsults.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-xs text-center py-6">No hay consultas aún</p>';
+                return;
+            }
+            const users = getBoxiUsers();
+            container.innerHTML = userConsults.map(c => {
+                const user = users[c.userId];
+                const userName = user ? user.name : 'Desconocido';
+                const isMe = c.userId === currentUserId;
+                const isReply = c.isReply;
+                const bgClass = isReply ? 'bg-green-50 border-green-200' : (isMe ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200');
+                const dateStr = new Date(c.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                return `<div class="border-2 ${bgClass} rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs font-bold ${isReply ? 'text-green-700' : 'text-blue-700'}">${isReply ? '🏋️ Entrenador' : userName}</span>
+                        <span class="text-[10px] text-gray-400">${dateStr}</span>
+                    </div>
+                    <p class="text-sm text-gray-700">${c.text}</p>
+                    ${isAdmin && !isReply ? `<button onclick="replyToConsult('${c.id}')" class="text-[10px] text-green-600 hover:underline mt-1"><i class="fas fa-reply mr-1"></i>Responder</button>` : ''}
+                </div>`;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function sendConsult() {
+            const input = document.getElementById('consultInput');
+            const text = input.value.trim();
+            if (!text) return;
+            const consults = getConsults();
+            consults.push({
+                id: 'c_' + Date.now(),
+                userId: currentUserId,
+                text: text,
+                date: new Date().toISOString(),
+                isReply: false
+            });
+            saveConsults(consults);
+            input.value = '';
+            renderConsultScreen();
+        }
+
+        function replyToConsult(consultId) {
+            const reply = prompt('Escribe tu respuesta:');
+            if (!reply || !reply.trim()) return;
+            const consults = getConsults();
+            const original = consults.find(c => c.id === consultId);
+            consults.push({
+                id: 'c_' + Date.now(),
+                userId: original ? original.userId : currentUserId,
+                text: reply.trim(),
+                date: new Date().toISOString(),
+                isReply: true
+            });
+            saveConsults(consults);
+            renderConsultScreen();
+        }
+
+        // LOGOUT
+        function logoutUser() {
+            currentUserId = null;
+            isAdmin = false;
+            nutritionModuleInitialized = false;
+            disableUserStorage();
+            originalRemoveItem('boxi_session');
+            document.body.classList.remove('authenticated');
+            document.getElementById('bottomNav').style.display = 'none';
+            renderLoginScreen();
+            showScreen('screenLogin');
+        }
+
+        // INIT AUTH SYSTEM
+        function initAuthSystem() {
+            setupRegisterPhoto();
+            setupProfilePhoto();
+            renderLoginScreen();
+            // Check if there's a session
+            const savedSession = originalGetItem('boxi_session');
+            if (savedSession) {
+                try {
+                    const session = JSON.parse(savedSession);
+                    if (session.userId) {
+                        const users = getBoxiUsers();
+                        const user = users[session.userId];
+                        if (user && getUserAuthStatus(user) === 'active') {
+                            currentUserId = session.userId;
+                            isAdmin = session.isAdmin || false;
+                            enableUserStorage();
+                            enterApp(user);
+                            return;
+                        }
+                    }
+                } catch(e) {}
+            }
+            showScreen('screenLogin');
+        }
+
+        // Save session on login
+        const _origEnterApp = enterApp;
+        enterApp = function(user) {
+            originalSetItem('boxi_session', JSON.stringify({ userId: currentUserId, isAdmin: isAdmin }));
+            _origEnterApp(user);
+        };
+
+        // Override DOMContentLoaded — don't auto-init app, wait for login
+        // The original DOMContentLoaded already ran, so we just init auth now
+        initAuthSystem();
     </script>
 </body>
 </html>
