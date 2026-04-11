@@ -3714,34 +3714,82 @@
                 list.innerHTML = '<p class="text-gray-400 text-xs text-center py-4">No hay usuarios registrados</p>';
                 return;
             }
+            const today = new Date().toISOString().split('T')[0];
             list.innerHTML = entries.map(u => {
                 const status = getUserAuthStatus(u);
-                const badge = status === 'active' ? '<span class="status-badge status-active">Activo</span>'
-                    : status === 'expired' ? '<span class="status-badge status-expired">Expirado</span>'
-                    : '<span class="status-badge status-pending">Pendiente</span>';
+                const isActive = status === 'active';
+                const badge = isActive ? '<span class="status-badge status-active"><i class="fas fa-check-circle mr-1"></i>Activo</span>'
+                    : status === 'expired' ? '<span class="status-badge status-expired"><i class="fas fa-times-circle mr-1"></i>Expirado</span>'
+                    : '<span class="status-badge status-pending"><i class="fas fa-clock mr-1"></i>Pendiente</span>';
                 const avatarHtml = u.photo
                     ? `<img src="${u.photo}" class="user-avatar" alt="${u.name}">`
                     : `<div class="user-avatar flex items-center justify-center text-xl text-amber-600 font-bold">${u.name.charAt(0).toUpperCase()}</div>`;
-                return `<div class="user-row flex-wrap">
-                    ${avatarHtml}
-                    <div class="flex-1 min-w-0">
-                        <p class="font-bold text-gray-800 text-sm">${u.name}</p>
-                        <p class="text-[10px] text-gray-400">Desde: ${new Date(u.createdAt).toLocaleDateString('es-ES')}</p>
-                        ${badge}
+                const defaultStart = u.authStart || today;
+                const defaultEnd = u.authEnd || '';
+                return `<div class="user-row flex-wrap" style="border-color: ${isActive ? '#22c55e' : '#e2e8f0'};">
+                    <div class="flex items-center gap-3 w-full mb-2">
+                        ${avatarHtml}
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold text-gray-800 text-sm">${u.name}</p>
+                            <p class="text-[10px] text-gray-400">Registrado: ${new Date(u.createdAt).toLocaleDateString('es-ES')}</p>
+                            ${badge}
+                        </div>
                     </div>
-                    <div class="flex flex-col gap-1 w-full sm:w-auto mt-2 sm:mt-0">
-                        <div class="flex items-center gap-1">
-                            <label class="text-[10px] text-gray-500 w-12">Inicio:</label>
-                            <input type="date" value="${u.authStart || ''}" onchange="updateUserAuth('${u.id}','authStart',this.value)" class="border border-gray-300 rounded px-2 py-1 text-xs">
+                    <div class="w-full bg-gray-50 rounded-lg p-3 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[11px] text-gray-600 font-semibold w-14">Inicio:</label>
+                            <input type="date" id="authStart_${u.id}" value="${defaultStart}" class="flex-1 border-2 border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-amber-400 focus:outline-none">
                         </div>
-                        <div class="flex items-center gap-1">
-                            <label class="text-[10px] text-gray-500 w-12">Fin:</label>
-                            <input type="date" value="${u.authEnd || ''}" onchange="updateUserAuth('${u.id}','authEnd',this.value)" class="border border-gray-300 rounded px-2 py-1 text-xs">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[11px] text-gray-600 font-semibold w-14">Fin:</label>
+                            <input type="date" id="authEnd_${u.id}" value="${defaultEnd}" class="flex-1 border-2 border-gray-200 rounded-lg px-3 py-2 text-xs focus:border-amber-400 focus:outline-none">
                         </div>
-                        <button onclick="deleteUser('${u.id}')" class="text-[10px] text-red-500 hover:text-red-700 mt-1"><i class="fas fa-trash mr-1"></i>Eliminar</button>
+                        <div class="flex gap-2 pt-1">
+                            <button onclick="activateUser('${u.id}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all">
+                                <i class="fas fa-check-circle mr-1"></i>${isActive ? 'Guardar fechas' : 'Activar'}
+                            </button>
+                            <button onclick="deactivateUser('${u.id}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all ${!isActive ? 'opacity-50' : ''}">
+                                <i class="fas fa-ban mr-1"></i>Desactivar
+                            </button>
+                        </div>
+                        <button onclick="deleteUser('${u.id}')" class="w-full text-[10px] text-red-400 hover:text-red-600 mt-1 text-center"><i class="fas fa-trash mr-1"></i>Eliminar usuario</button>
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        function activateUser(userId) {
+            const startInput = document.getElementById('authStart_' + userId);
+            const endInput = document.getElementById('authEnd_' + userId);
+            const startVal = startInput ? startInput.value : '';
+            const endVal = endInput ? endInput.value : '';
+            if (!startVal || !endVal) {
+                alert('Debes seleccionar fecha de inicio y fecha de fin para activar al usuario.');
+                return;
+            }
+            if (new Date(endVal) < new Date(startVal)) {
+                alert('La fecha de fin no puede ser anterior a la fecha de inicio.');
+                return;
+            }
+            const users = getBoxiUsers();
+            if (users[userId]) {
+                users[userId].authStart = startVal;
+                users[userId].authEnd = endVal;
+                saveBoxiUsers(users);
+                renderAdminPanel();
+                alert('✅ Usuario "' + users[userId].name + '" activado hasta ' + new Date(endVal).toLocaleDateString('es-ES'));
+            }
+        }
+
+        function deactivateUser(userId) {
+            const users = getBoxiUsers();
+            if (!users[userId]) return;
+            if (!confirm('¿Desactivar a ' + users[userId].name + '? No podrá acceder a Boxi.')) return;
+            users[userId].authStart = null;
+            users[userId].authEnd = null;
+            saveBoxiUsers(users);
+            renderAdminPanel();
+            alert('🚫 Usuario "' + users[userId].name + '" desactivado.');
         }
 
         function updateUserAuth(userId, field, value) {
@@ -3749,7 +3797,6 @@
             if (users[userId]) {
                 users[userId][field] = value || null;
                 saveBoxiUsers(users);
-                renderAdminPanel();
             }
         }
 
