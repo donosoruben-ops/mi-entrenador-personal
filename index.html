@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
     <style>
         body {
             background: #f5f5f5;
@@ -477,8 +479,47 @@
 </head>
 <body class="p-0">
 
+    <!-- ========== LOADING SCREEN ========== -->
+    <div id="screenLoading" class="auth-screen">
+        <div class="auth-card text-center">
+            <div class="text-5xl mb-4">🏋️</div>
+            <h1 class="text-2xl font-bold text-amber-900 mb-2">Boxi</h1>
+            <p class="text-amber-700 text-sm mb-4">Conectando al servidor...</p>
+            <div style="width:40px;height:40px;border:4px solid #fde68a;border-top:4px solid #d97706;border-radius:50%;margin:0 auto;" class="animate-spin"></div>
+        </div>
+    </div>
+
+    <!-- ========== FIREBASE SETUP SCREEN (admin first-time) ========== -->
+    <div id="screenFirebaseSetup" class="auth-screen" style="display:none;">
+        <div class="auth-card">
+            <h2 class="text-xl font-bold text-amber-900 mb-2 text-center"><i class="fas fa-server mr-2"></i>Configuración Inicial</h2>
+            <p class="text-gray-500 text-xs text-center mb-4">Pega la configuración de Firebase desde la consola</p>
+            <textarea id="firebaseConfigInput" rows="8" placeholder='Pega aquí el objeto de configuración de Firebase, por ejemplo:
+{
+  "apiKey": "AIza...",
+  "authDomain": "mi-app.firebaseapp.com",
+  "databaseURL": "https://mi-app-default-rtdb.firebaseio.com",
+  "projectId": "mi-app"
+}' class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-xs font-mono focus:border-amber-400 focus:outline-none mb-3"></textarea>
+            <button onclick="saveFirebaseConfig()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-sm">
+                <i class="fas fa-plug mr-2"></i>Conectar
+            </button>
+            <p id="firebaseSetupError" class="text-red-500 text-xs text-center mt-2 hidden"></p>
+            <div class="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3">
+                <p class="text-[11px] text-blue-800 font-semibold mb-1"><i class="fas fa-info-circle mr-1"></i>¿Cómo obtener esto?</p>
+                <ol class="text-[10px] text-blue-700 space-y-1 list-decimal ml-3">
+                    <li>Ve a <strong>console.firebase.google.com</strong></li>
+                    <li>Crea un proyecto nuevo</li>
+                    <li>Ve a Realtime Database → Crear base de datos → Modo de prueba</li>
+                    <li>Ve a Configuración del proyecto → Tus apps → Web → Registrar app</li>
+                    <li>Copia el objeto <code>firebaseConfig</code> y pégalo aquí</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== LOGIN SCREEN ========== -->
-    <div id="screenLogin" class="auth-screen">
+    <div id="screenLogin" class="auth-screen" style="display:none;">
         <div class="auth-card text-center">
             <h1 class="text-4xl font-bold text-amber-900 mb-1">🏋️ Boxi</h1>
             <p class="text-amber-700 text-sm mb-6">Entrenamiento y Nutrición Personalizada</p>
@@ -3505,20 +3546,108 @@
         const originalRemoveItem = localStorage.removeItem.bind(localStorage);
         const perUserKeys = ['weeklyPlan','planDate','weekNumber','workoutProgress','crossfitProgress','nutritionRecords','trainingMode','weeklySchedule','athleteObjectives'];
 
-        function getBoxiUsers() {
-            try { return JSON.parse(originalGetItem('boxi_users') || '{}'); } catch(e) { return {}; }
-        }
+        // Firebase sync state
+        let firebaseDB = null;
+        let firebaseReady = false;
+        let cachedUsers = {};
+        let cachedConsults = [];
+        let cachedAdminPass = DEFAULT_ADMIN_PASS;
+
+        function getBoxiUsers() { return cachedUsers; }
         function saveBoxiUsers(users) {
-            originalSetItem('boxi_users', JSON.stringify(users));
+            cachedUsers = users;
+            if (firebaseDB) firebaseDB.ref('users').set(users);
         }
-        function getAdminPass() {
-            return originalGetItem('boxi_admin_pass') || DEFAULT_ADMIN_PASS;
-        }
-        function getConsults() {
-            try { return JSON.parse(originalGetItem('boxi_consults') || '[]'); } catch(e) { return []; }
-        }
+        function getAdminPass() { return cachedAdminPass || DEFAULT_ADMIN_PASS; }
+        function getConsults() { return Array.isArray(cachedConsults) ? cachedConsults : []; }
         function saveConsults(c) {
-            originalSetItem('boxi_consults', JSON.stringify(c));
+            cachedConsults = c;
+            if (firebaseDB) firebaseDB.ref('consults').set(c);
+        }
+
+        function saveFirebaseConfig() {
+            const raw = document.getElementById('firebaseConfigInput').value.trim();
+            const errEl = document.getElementById('firebaseSetupError');
+            try {
+                let config;
+                const jsonMatch = raw.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    let cleaned = jsonMatch[0].replace(/(\w+)\s*:/g, '"$1":').replace(/'/g, '"').replace(/,\s*\}/g, '}');
+                    config = JSON.parse(cleaned);
+                } else {
+                    throw new Error('No se encontró un objeto de configuración');
+                }
+                if (!config.databaseURL && !config.projectId) {
+                    throw new Error('Falta databaseURL o projectId en la configuración');
+                }
+                originalSetItem('boxi_firebase_config', JSON.stringify(config));
+                errEl.classList.add('hidden');
+                location.reload();
+            } catch(e) {
+                errEl.textContent = 'Error: ' + e.message;
+                errEl.classList.remove('hidden');
+            }
+        }
+
+        // Default Firebase config (auto-generated)
+        const BOXI_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCGiLBTworXEztpQ1tjVjD2LIzS3k23UzI",
+            authDomain: "boxi-gym-app.firebaseapp.com",
+            databaseURL: "https://boxi-gym-app-default-rtdb.firebaseio.com",
+            projectId: "boxi-gym-app",
+            storageBucket: "boxi-gym-app.firebasestorage.app",
+            messagingSenderId: "474386944118",
+            appId: "1:474386944118:web:20e8ca780ab1196dfecf57"
+        };
+
+        async function initFirebase() {
+            let config = BOXI_FIREBASE_CONFIG;
+            const savedConfig = originalGetItem('boxi_firebase_config');
+            if (savedConfig) {
+                try { config = JSON.parse(savedConfig); } catch(e) {}
+            }
+            try {
+                firebase.initializeApp(config);
+                firebaseDB = firebase.database();
+
+                const [usersSnap, passSnap, consultsSnap] = await Promise.all([
+                    firebaseDB.ref('users').once('value'),
+                    firebaseDB.ref('adminPass').once('value'),
+                    firebaseDB.ref('consults').once('value')
+                ]);
+
+                cachedUsers = usersSnap.val() || {};
+                cachedAdminPass = passSnap.val() || DEFAULT_ADMIN_PASS;
+                const cVal = consultsSnap.val();
+                cachedConsults = Array.isArray(cVal) ? cVal : [];
+
+                firebaseDB.ref('users').on('value', snap => {
+                    cachedUsers = snap.val() || {};
+                    if (firebaseReady) {
+                        const loginEl = document.getElementById('screenLogin');
+                        const adminEl = document.getElementById('screenAdmin');
+                        if (loginEl && loginEl.style.display !== 'none') renderLoginScreen();
+                        if (adminEl && adminEl.style.display !== 'none') renderAdminPanel();
+                    }
+                });
+                firebaseDB.ref('consults').on('value', snap => {
+                    const v = snap.val();
+                    cachedConsults = Array.isArray(v) ? v : [];
+                });
+                firebaseDB.ref('adminPass').on('value', snap => {
+                    cachedAdminPass = snap.val() || DEFAULT_ADMIN_PASS;
+                });
+
+                firebaseReady = true;
+                console.log('🔥 Firebase conectado correctamente');
+                return true;
+            } catch(e) {
+                console.error('Firebase init error:', e);
+                alert('Error conectando a Firebase: ' + e.message + '\nSe mostrará la pantalla de configuración.');
+                originalRemoveItem('boxi_firebase_config');
+                showScreen('screenFirebaseSetup');
+                return false;
+            }
         }
 
         function generateUserId() {
@@ -3554,7 +3683,7 @@
 
         // Screen management
         function showScreen(screenId) {
-            const allScreens = ['screenLogin','screenRegister','screenAdminLogin','screenAdmin','screenProfile','screenConsult','screenApp'];
+            const allScreens = ['screenLoading','screenFirebaseSetup','screenLogin','screenRegister','screenAdminLogin','screenAdmin','screenProfile','screenConsult','screenApp'];
             allScreens.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
@@ -3658,9 +3787,27 @@
         function changeAdminPass() {
             const newPass = document.getElementById('newAdminPass').value.trim();
             if (newPass.length < 4) { alert('La clave debe tener al menos 4 caracteres'); return; }
-            originalSetItem('boxi_admin_pass', newPass);
+            cachedAdminPass = newPass;
+            if (firebaseDB) firebaseDB.ref('adminPass').set(newPass);
             document.getElementById('newAdminPass').value = '';
             alert('Clave de admin actualizada');
+        }
+
+        // Compress photo for Firebase (max ~100KB)
+        function compressPhoto(dataUrl, maxSize, callback) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > maxSize || h > maxSize) {
+                    if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+                    else { w = Math.round(w * maxSize / h); h = maxSize; }
+                }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                callback(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.src = dataUrl;
         }
 
         // REGISTER
@@ -3670,8 +3817,10 @@
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = function(ev) {
-                    registerPhotoData = ev.target.result;
-                    document.getElementById('registerAvatarCircle').innerHTML = `<img src="${registerPhotoData}" alt="foto">`;
+                    compressPhoto(ev.target.result, 200, function(compressed) {
+                        registerPhotoData = compressed;
+                        document.getElementById('registerAvatarCircle').innerHTML = `<img src="${compressed}" alt="foto">`;
+                    });
                 };
                 reader.readAsDataURL(file);
             });
@@ -3923,8 +4072,10 @@
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = function(ev) {
-                    profilePhotoData = ev.target.result;
-                    document.getElementById('profileAvatarCircle').innerHTML = `<img src="${profilePhotoData}" alt="foto">`;
+                    compressPhoto(ev.target.result, 200, function(compressed) {
+                        profilePhotoData = compressed;
+                        document.getElementById('profileAvatarCircle').innerHTML = `<img src="${compressed}" alt="foto">`;
+                    });
                 };
                 reader.readAsDataURL(file);
             });
@@ -4026,11 +4177,17 @@
         }
 
         // INIT AUTH SYSTEM
-        function initAuthSystem() {
+        async function initAuthSystem() {
             setupRegisterPhoto();
             setupProfilePhoto();
+
+            showScreen('screenLoading');
+            const fbOk = await initFirebase();
+            if (!fbOk) return;
+
             renderLoginScreen();
-            // Check if there's a session
+
+            // Check if there's a saved session
             const savedSession = originalGetItem('boxi_session');
             if (savedSession) {
                 try {
@@ -4058,8 +4215,7 @@
             _origEnterApp(user);
         };
 
-        // Override DOMContentLoaded — don't auto-init app, wait for login
-        // The original DOMContentLoaded already ran, so we just init auth now
+        // Start auth system (waits for Firebase)
         initAuthSystem();
     </script>
 </body>
