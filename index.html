@@ -568,6 +568,20 @@
         .tp-btn-remove {
             background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca;
         }
+        /* Per-exercise remove button (×) overlay on weights cards */
+        .ex-remove-wrap { position: relative; }
+        .ex-remove-btn {
+            position: absolute; top: 6px; right: 6px;
+            width: 22px; height: 22px;
+            border: none; border-radius: 50%;
+            background: rgba(220,38,38,0.9); color: white;
+            font-size: 11px; font-weight: 900;
+            cursor: pointer; z-index: 5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+            display: flex; align-items: center; justify-content: center;
+            line-height: 1;
+        }
+        .ex-remove-btn:hover { background: rgba(185,28,28,0.95); }
         .cal-time-chip-wrap { display: block; margin: 2px 0 4px 0; text-align: center; }
         .cal-time-chip {
             display: inline-block; font-weight: 900; color: #fff;
@@ -3079,8 +3093,8 @@
             saveCalendarSchedule();
             closeSessionPicker();
 
-            // For weights, prompt muscle groups only when activating fresh
-            if (activity === 'weights' && !wasActive) {
+            // For weights, prompt muscle groups every time so the user can adjust per-session targets
+            if (activity === 'weights') {
                 openMuscleGroupPicker(dateKey);
             } else {
                 renderCalendar();
@@ -3164,11 +3178,70 @@
             return sessions;
         }
 
+        // Compute the exercises that belong to a given weights session for a date.
+        // Returns [{ ex, idx }] where idx is the index in the FULL enrichedPlan
+        // (so workoutProgress keeps using the same idx and the ✕ "remove" button
+        // operates on the right slot).
+        //
+        // Strategy:
+        //  - 1 session: every exercise (minus weightsRemovedA).
+        //  - 2 sessions: prefer filtering by muscles1/muscles2 when ex.muscle is set
+        //    AND the muscle sets differ. Otherwise fall back to a 50/50 split.
+        function getSessionWeightsExercises(dk, sessionIdx, fullEnrichedPlan, totalSessions) {
+            const sched = calendarSchedule[dk] || {};
+            const muscles1 = sched.muscles || [];
+            const muscles2 = sched.muscles2 || [];
+            const removedA = new Set(sched.weightsRemovedA || []);
+            const removedB = new Set(sched.weightsRemovedB || []);
+            const removed = sessionIdx === 1 ? removedA : removedB;
+
+            // Annotate with original index
+            const annotated = fullEnrichedPlan.map((ex, idx) => ({ ex, idx }));
+
+            if (totalSessions <= 1) {
+                return annotated.filter(p => !removed.has(p.idx));
+            }
+
+            const set1 = new Set(muscles1);
+            const set2 = new Set(muscles2);
+            const hasAny = set1.size > 0 || set2.size > 0;
+            const differ = [...set1].some(m => !set2.has(m)) || [...set2].some(m => !set1.has(m));
+            const distinct = hasAny && differ;
+            const allHaveMuscle = annotated.every(p => p.ex && p.ex.muscle);
+
+            if (distinct && allHaveMuscle) {
+                const target = sessionIdx === 1 ? set1 : set2;
+                return annotated.filter(p => target.has(p.ex.muscle) && !removed.has(p.idx));
+            }
+
+            // Fallback: 50/50 split
+            const half = Math.ceil(annotated.length / 2);
+            const slice = sessionIdx === 1 ? annotated.slice(0, half) : annotated.slice(half);
+            return slice.filter(p => !removed.has(p.idx));
+        }
+
+        // Remove an exercise from a specific weights session (by original idx).
+        function removeWeightsExFromSession(dk, sessionIdx, idx) {
+            if (!confirm('¿Quitar este ejercicio de esta sesión?')) return;
+            if (!calendarSchedule[dk]) calendarSchedule[dk] = { weights: false, crossfit: false };
+            const key = sessionIdx === 1 ? 'weightsRemovedA' : 'weightsRemovedB';
+            const arr = calendarSchedule[dk][key] || [];
+            if (!arr.includes(idx)) arr.push(idx);
+            calendarSchedule[dk][key] = arr;
+            saveCalendarSchedule();
+            renderTodayWorkout();
+            renderWeeklyWorkouts();
+            renderCalendar();
+        }
+
         function openMuscleGroupPicker(dateKey) {
             const dateParts = dateKey.split('-');
             const dateObj = new Date(+dateParts[0], +dateParts[1] - 1, +dateParts[2]);
             const dayName = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-            const existing = calendarSchedule[dateKey]?.muscles || [];
+            const sched = calendarSchedule[dateKey] || {};
+            const existing1 = sched.muscles || [];
+            const existing2 = sched.muscles2 || [];
+            const hasTwo = !!(sched.weightsStart2 && sched.weightsEnd2);
 
             const GROUPS = [
                 { key: 'back', label: 'Espalda', icon: '🔙' },
@@ -3185,20 +3258,39 @@
             overlay.id = 'musclePickerOverlay';
             overlay.className = 'time-picker-overlay';
 
-            const groupButtons = GROUPS.map(g => {
-                const isSelected = existing.includes(g.key);
-                return `<button type="button" data-muscle="${g.key}" class="muscle-pick-btn ${isSelected ? 'selected' : ''}" onclick="this.classList.toggle('selected')">
-                    <span style="font-size:1.5rem;">${g.icon}</span><br><span class="text-xs font-bold">${g.label}</span>
-                </button>`;
-            }).join('');
+            function buildGroupButtons(slotIdx, existing) {
+                return GROUPS.map(g => {
+                    const isSelected = existing.includes(g.key);
+                    return `<button type="button" data-muscle="${g.key}" data-slot="${slotIdx}" class="muscle-pick-btn ${isSelected ? 'selected' : ''}" onclick="this.classList.toggle('selected')">
+                        <span style="font-size:1.5rem;">${g.icon}</span><br><span class="text-xs font-bold">${g.label}</span>
+                    </button>`;
+                }).join('');
+            }
+
+            const t1 = (sched.weightsStart && sched.weightsEnd) ? `${formatTime12hCompact(sched.weightsStart)}–${formatTime12hCompact(sched.weightsEnd)}` : '';
+            const t2 = (sched.weightsStart2 && sched.weightsEnd2) ? `${formatTime12hCompact(sched.weightsStart2)}–${formatTime12hCompact(sched.weightsEnd2)}` : '';
+
+            const block1Html = `
+                <div class="sess-block">
+                    <div class="sess-title">💪 ${hasTwo ? 'Sesión 1' : 'Pesas'}${t1 ? ' · ' + t1 : ''}</div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;">
+                        ${buildGroupButtons(1, existing1)}
+                    </div>
+                </div>`;
+            const block2Html = hasTwo ? `
+                <div class="sess-block">
+                    <div class="sess-title">💪 Sesión 2${t2 ? ' · ' + t2 : ''}</div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;">
+                        ${buildGroupButtons(2, existing2)}
+                    </div>
+                </div>` : '';
 
             overlay.innerHTML = `
-                <div class="time-picker-card">
+                <div class="time-picker-card" style="max-width:380px;">
                     <h3>💪 Grupos musculares — ${dayName}</h3>
-                    <p class="tp-subtitle">Selecciona 1 o 2 grupos musculares para este día. La IA distribuirá todos los grupos en la semana.</p>
-                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0;">
-                        ${groupButtons}
-                    </div>
+                    <p class="tp-subtitle">${hasTwo ? 'Selecciona los grupos musculares para CADA sesión por separado. Cada sesión tendrá su propio plan de ejercicios.' : 'Selecciona 1 o 2 grupos musculares para este día. La IA distribuirá todos los grupos en la semana.'}</p>
+                    ${block1Html}
+                    ${block2Html}
                     <div class="tp-btns">
                         <button class="tp-btn-cancel" onclick="closeMuscleGroupPicker()">Omitir</button>
                         <button class="tp-btn-confirm" onclick="confirmMuscleGroupPicker('${dateKey}')">✅ Confirmar</button>
@@ -3217,14 +3309,19 @@
 
         function confirmMuscleGroupPicker(dateKey) {
             const overlay = document.getElementById('musclePickerOverlay');
-            const selected = [];
+            const selected1 = [], selected2 = [];
             if (overlay) {
                 overlay.querySelectorAll('.muscle-pick-btn.selected').forEach(btn => {
-                    selected.push(btn.dataset.muscle);
+                    if (btn.dataset.slot === '2') selected2.push(btn.dataset.muscle);
+                    else selected1.push(btn.dataset.muscle);
                 });
             }
             if (!calendarSchedule[dateKey]) calendarSchedule[dateKey] = { weights: false, crossfit: false };
-            calendarSchedule[dateKey].muscles = selected;
+            calendarSchedule[dateKey].muscles = selected1;
+            const sched = calendarSchedule[dateKey];
+            const hasTwo = !!(sched.weightsStart2 && sched.weightsEnd2);
+            if (hasTwo) calendarSchedule[dateKey].muscles2 = selected2;
+            else delete calendarSchedule[dateKey].muscles2;
             saveCalendarSchedule();
             closeMuscleGroupPicker();
         }
@@ -3673,12 +3770,16 @@
                     : `<div class="font-bold text-gray-800 text-sm">${day}</div>`;
                 content += `<div class="cal-toggles-stack" style="margin-top:2px;">`;
                 content += `<div class="cal-toggle-row"><span class="${wClass}" title="Pesas — toca para configurar" onclick="event.stopPropagation();openSessionPicker('${dateKey}','weights')">💪${wCntBadge}</span></div>`;
-                if (wChip) content += wChip;
-                if (wChip2) content += wChip2;
                 content += `<div class="cal-toggle-row"><span class="${cfClass}" title="CrossFit — toca para configurar" onclick="event.stopPropagation();openSessionPicker('${dateKey}','crossfit')">🏃${cfCntBadge}</span></div>`;
-                if (cfChip) content += cfChip;
-                if (cfChip2) content += cfChip2;
                 content += `</div>`;
+                // Chronologically-ordered time chips (mix weights + crossfit by start time)
+                const orderedChips = [];
+                if (schedule.weights && fullSched.weightsStart) orderedChips.push({ s: fullSched.weightsStart, h: wChip });
+                if (schedule.weights && wHasSecond) orderedChips.push({ s: fullSched.weightsStart2, h: wChip2 });
+                if (schedule.crossfit && fullSched.crossfitStart) orderedChips.push({ s: fullSched.crossfitStart, h: cfChip });
+                if (schedule.crossfit && cfHasSecond) orderedChips.push({ s: fullSched.crossfitStart2, h: cfChip2 });
+                orderedChips.sort((a, b) => (a.s || '99:99').localeCompare(b.s || '99:99'));
+                orderedChips.forEach(c => { if (c.h) content += c.h; });
                 content += musclesBadge;
                 
                 dayCell.innerHTML = content;
@@ -5398,9 +5499,6 @@
 
             const enrichedExercises = (schedule.weights && exercises.length > 0)
                 ? await enrichExercisesWithVideoStatus(exercises) : [];
-            const wSlices = wSessions.length === 2
-                ? [enrichedExercises.slice(0, Math.ceil(enrichedExercises.length / 2)), enrichedExercises.slice(Math.ceil(enrichedExercises.length / 2))]
-                : [enrichedExercises];
 
             let weightsBlocksRendered = 0;
             let cfBlocksRendered = 0;
@@ -5408,22 +5506,30 @@
 
             daySessions.forEach(s => {
                 if (s.type === 'weights') {
-                    const slice = wSlices[weightsBlocksRendered] || [];
+                    const sessionItems = getSessionWeightsExercises(dk, s.sessionIdx, enrichedExercises, wSessions.length);
                     const sessionLabel = wSessions.length > 1
                         ? (s.sessionIdx === 1 ? 'Sesión 1' : 'Sesión 2') : '';
                     const timeLbl = (s.start && s.end) ? `${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}` : '';
-                    html += `<div class="mt-2 mb-1 flex items-center gap-2 text-sm font-bold text-purple-700">
+                    const sessSched = calendarSchedule[dk] || {};
+                    const sessMuscles = (s.sessionIdx === 1 ? (sessSched.muscles || []) : (sessSched.muscles2 || []));
+                    const MUSCLE_ICONS_LOCAL = { back: '🔙', shoulders: '🦾', biceps: '💪', triceps: '🏋️', chest: '🫁', legs: '🦵' };
+                    const MUSCLE_LABELS_LOCAL = { back: 'Espalda', shoulders: 'Hombros', biceps: 'Bíceps', triceps: 'Tríceps', chest: 'Pecho', legs: 'Piernas' };
+                    const sessMusclePills = (wSessions.length > 1 && sessMuscles.length > 0)
+                        ? sessMuscles.map(m => `<span class="inline-flex items-center gap-1 bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full text-[10px] font-bold">${MUSCLE_ICONS_LOCAL[m] || '💪'} ${MUSCLE_LABELS_LOCAL[m] || m}</span>`).join(' ')
+                        : '';
+                    html += `<div class="mt-3 mb-1 flex flex-wrap items-center gap-2 text-sm font-bold text-purple-700">
                         <span>💪 PESAS${sessionLabel ? ' · ' + sessionLabel : ''}</span>
                         ${timeLbl ? `<span class="cal-time-chip">${timeLbl}</span>` : ''}
+                        ${sessMusclePills}
                     </div>`;
-                    if (slice.length > 0) {
-                        slice.forEach(ex => {
-                            const idx = enrichedExercises.indexOf(ex);
-                            const sets = enrichedExercises.length > 5 ? '4x10' : '3x10';
-                            const duration = enrichedExercises.length > 5 ? '~12 min' : '~10 min';
-                            html += renderExerciseCard(ex, idx, sets, duration, 'purple', dk);
+                    if (sessionItems.length > 0) {
+                        const sets = enrichedExercises.length > 5 ? '4x10' : '3x10';
+                        const duration = enrichedExercises.length > 5 ? '~12 min' : '~10 min';
+                        sessionItems.forEach(({ ex, idx }) => {
+                            const card = renderExerciseCard(ex, idx, sets, duration, 'purple', dk);
+                            html += `<div class="ex-remove-wrap mb-2"><button class="ex-remove-btn" title="Quitar de esta sesión" onclick="event.stopPropagation();removeWeightsExFromSession('${dk}',${s.sessionIdx},${idx})">✕</button>${card}</div>`;
                         });
-                    } else if (wSessions.length > 1) {
+                    } else {
                         html += `<p class="text-xs text-gray-400 italic">Sin ejercicios asignados a esta sesión.</p>`;
                     }
                     weightsBlocksRendered++;
@@ -5628,13 +5734,13 @@
                 
                 let exerciseCount = 0;
 
-                // Render blocks in chronological order. If a type has 2 sessions, split the plan in halves.
+                // Render blocks in chronological order. Each weights session gets its own
+                // independent slice of exercises (filtered by muscles1/muscles2 when set,
+                // or split 50/50 as fallback). Each card carries a × button to remove from
+                // that specific session.
                 const enrichedPlan = (schedule.weights && pm.plan.length > 0)
                     ? await enrichExercisesWithVideoStatus(pm.plan) : [];
                 exerciseCount = enrichedPlan.length;
-                const wSlices = wSessions.length === 2
-                    ? [enrichedPlan.slice(0, Math.ceil(enrichedPlan.length / 2)), enrichedPlan.slice(Math.ceil(enrichedPlan.length / 2))]
-                    : [enrichedPlan];
 
                 let weightsBlocksRendered = 0;
                 let cfBlocksRendered = 0;
@@ -5642,23 +5748,31 @@
 
                 daySessions.forEach(s => {
                     if (s.type === 'weights') {
-                        const slice = wSlices[weightsBlocksRendered] || [];
+                        const sessionItems = getSessionWeightsExercises(dk, s.sessionIdx, enrichedPlan, wSessions.length);
                         const sessionLabel = wSessions.length > 1
                             ? (s.sessionIdx === 1 ? 'Sesión 1' : 'Sesión 2')
                             : '';
                         const timeLbl = (s.start && s.end) ? `${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}` : '';
-                        html += `<div class="mt-2 mb-1 flex items-center gap-2 text-xs font-bold text-purple-700">
+                        const sessSched = calendarSchedule[dk] || {};
+                        const sessMuscles = (s.sessionIdx === 1 ? (sessSched.muscles || []) : (sessSched.muscles2 || []));
+                        const MUSCLE_ICONS_LOCAL = { back: '🔙', shoulders: '🦾', biceps: '💪', triceps: '🏋️', chest: '🫁', legs: '🦵' };
+                        const MUSCLE_LABELS_LOCAL = { back: 'Espalda', shoulders: 'Hombros', biceps: 'Bíceps', triceps: 'Tríceps', chest: 'Pecho', legs: 'Piernas' };
+                        const sessMusclePills = (wSessions.length > 1 && sessMuscles.length > 0)
+                            ? sessMuscles.map(m => `<span class="inline-flex items-center gap-1 bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full text-[10px] font-bold">${MUSCLE_ICONS_LOCAL[m] || '💪'} ${MUSCLE_LABELS_LOCAL[m] || m}</span>`).join(' ')
+                            : '';
+                        html += `<div class="mt-3 mb-1 flex flex-wrap items-center gap-2 text-xs font-bold text-purple-700">
                             <span>💪 PESAS${sessionLabel ? ' · ' + sessionLabel : ''}</span>
                             ${timeLbl ? `<span class="cal-time-chip">${timeLbl}</span>` : ''}
+                            ${sessMusclePills}
                         </div>`;
-                        if (slice.length > 0) {
-                            slice.forEach((ex) => {
-                                const idx = enrichedPlan.indexOf(ex);
-                                const sets = enrichedPlan.length > 5 ? '4x10' : '3x10';
-                                const duration = enrichedPlan.length > 5 ? '~12 min' : '~10 min';
-                                html += renderExerciseCard(ex, idx, sets, duration, color, dk);
+                        if (sessionItems.length > 0) {
+                            const sets = enrichedPlan.length > 5 ? '4x10' : '3x10';
+                            const duration = enrichedPlan.length > 5 ? '~12 min' : '~10 min';
+                            sessionItems.forEach(({ ex, idx }) => {
+                                const card = renderExerciseCard(ex, idx, sets, duration, color, dk);
+                                html += `<div class="ex-remove-wrap mb-2"><button class="ex-remove-btn" title="Quitar de esta sesión" onclick="event.stopPropagation();removeWeightsExFromSession('${dk}',${s.sessionIdx},${idx})">✕</button>${card}</div>`;
                             });
-                        } else if (wSessions.length > 1) {
+                        } else {
                             html += `<p class="text-xs text-gray-400 italic">Sin ejercicios asignados a esta sesión.</p>`;
                         }
                         weightsBlocksRendered++;
