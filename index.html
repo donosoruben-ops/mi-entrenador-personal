@@ -528,7 +528,46 @@
         .muscle-pick-btn.selected { border-color: #7c3aed; background: #ede9fe; box-shadow: 0 0 0 3px rgba(124,58,237,0.2); }
         .cal-toggle .time-badge { display: none; }
         .cal-toggles-stack { display: flex; flex-direction: column; gap: 1px; }
-        .cal-toggle-row { display: block; }
+        .cal-toggle-row { display: block; text-align: center; }
+        /* Compact icon-only button used in narrow month-calendar cells */
+        .cal-toggle.compact {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 24px; height: 22px; padding: 2px 5px;
+            font-size: 13px; line-height: 1; gap: 2px;
+        }
+        .cal-toggle.compact .cnt {
+            font-size: 9px; font-weight: 900; opacity: 0.85;
+        }
+        /* Session count picker (1 / 2) */
+        .sess-count-row { display: flex; gap: 8px; margin: 6px 0 12px; }
+        .sess-count-btn {
+            flex: 1; padding: 10px 4px; border-radius: 10px;
+            border: 2px solid #e5e7eb; background: #f9fafb; cursor: pointer;
+            font-weight: 800; font-size: 0.8rem; color: #6b7280;
+            transition: all 0.15s; text-align: center;
+        }
+        .sess-count-btn:hover { border-color: #a78bfa; }
+        .sess-count-btn.selected {
+            border-color: #7c3aed; background: #ede9fe; color: #6d28d9;
+            box-shadow: 0 0 0 3px rgba(124,58,237,0.2);
+        }
+        .sess-count-btn.cf.selected {
+            border-color: #f97316; background: #fff7ed; color: #ea580c;
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.2);
+        }
+        .sess-block {
+            background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px;
+            padding: 10px; margin-bottom: 10px;
+        }
+        .sess-block .sess-title {
+            font-size: 0.75rem; font-weight: 800; color: #475569;
+            margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px;
+        }
+        .sess-block .sess-row { display: flex; gap: 8px; }
+        .sess-block .sess-row > div { flex: 1; }
+        .tp-btn-remove {
+            background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca;
+        }
         .cal-time-chip-wrap { display: block; margin: 2px 0 4px 0; text-align: center; }
         .cal-time-chip {
             display: inline-block; font-weight: 900; color: #fff;
@@ -600,7 +639,8 @@
             overflow-x: auto;
             padding-top: 18px; /* leaves room for the floating ⭐ HOY badge that sits at top:-12px */
             padding-bottom: 0.5rem;
-            scroll-snap-type: x mandatory;
+            scroll-snap-type: x proximity;
+            -webkit-overflow-scrolling: touch;
             scrollbar-width: auto;
             scrollbar-color: #0f172a #bae6fd;
         }
@@ -1981,7 +2021,7 @@
                 rows += `
                     <tr class="border-b border-orange-100">
                         <td class="py-1 pr-1 text-[10px] text-gray-400 font-bold w-4">${i + 1}</td>
-                        <td class="py-1 pr-1"><input type="text" value="${r.name}" placeholder="Ejercicio" class="w-full text-xs border border-orange-200 rounded px-1.5 py-0.5 focus:border-orange-400 focus:outline-none" id="${uid}_name" onchange="updateCrossfitRow('${dk}',${i})" oninput="updateCrossfitRow('${dk}',${i})"/></td>
+                        <td class="py-1 pr-1"><input type="text" list="cfExerciseList" value="${r.name}" placeholder="Ejercicio" autocomplete="off" class="w-full text-xs border border-orange-200 rounded px-1.5 py-0.5 focus:border-orange-400 focus:outline-none" id="${uid}_name" onchange="updateCrossfitRow('${dk}',${i})" oninput="updateCrossfitRow('${dk}',${i})"/></td>
                         <td class="py-1 px-1">
                             <div class="flex items-center gap-0.5">
                                 <input type="number" min="0" max="200" value="${r.pct}" placeholder="%" class="w-12 text-center text-xs border border-orange-200 rounded py-0.5 font-bold focus:border-orange-400 focus:outline-none" id="${uid}_pct" onchange="updateCrossfitRow('${dk}',${i})" oninput="updateCrossfitRow('${dk}',${i})"/>
@@ -2885,6 +2925,245 @@
             }
         }
 
+        // Session picker — supports 1 or 2 daily sessions for weights/crossfit
+        function openSessionPicker(dateKey, activity) {
+            const isWeights = activity === 'weights';
+            const actLabel = isWeights ? '💪 Pesas' : '🏃 CrossFit';
+            const cssCls = isWeights ? '' : 'cf';
+            const dateParts = dateKey.split('-');
+            const dateObj = new Date(+dateParts[0], +dateParts[1] - 1, +dateParts[2]);
+            const dayName = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+
+            const existing = calendarSchedule[dateKey] || {};
+            const isActive = !!existing[activity];
+            const startKey = activity + 'Start';
+            const endKey = activity + 'End';
+            const startKey2 = activity + 'Start2';
+            const endKey2 = activity + 'End2';
+            const hasSecond = !!(existing[startKey2] && existing[endKey2]);
+            const initialCount = isActive && hasSecond ? 2 : 1;
+
+            const defS1 = existing[startKey] || (isWeights ? '08:00' : '18:00');
+            const defE1 = existing[endKey] || (isWeights ? '09:30' : '19:00');
+            const defS2 = existing[startKey2] || (isWeights ? '21:00' : '20:00');
+            const defE2 = existing[endKey2] || (isWeights ? '22:30' : '21:00');
+
+            let overlay = document.getElementById('sessionPickerOverlay');
+            if (overlay) overlay.remove();
+            overlay = document.createElement('div');
+            overlay.id = 'sessionPickerOverlay';
+            overlay.className = 'time-picker-overlay';
+            overlay.innerHTML = `
+                <div class="time-picker-card">
+                    <h3>${actLabel} — ${dayName}</h3>
+                    <p class="tp-subtitle">¿Cuántas veces irás hoy?</p>
+                    <div class="sess-count-row" id="sessCountRow">
+                        <button type="button" class="sess-count-btn ${cssCls} ${initialCount===1?'selected':''}" data-count="1">1 vez</button>
+                        <button type="button" class="sess-count-btn ${cssCls} ${initialCount===2?'selected':''}" data-count="2">2 veces</button>
+                    </div>
+                    <div id="sessBlocks"></div>
+                    <div class="tp-time-summary" id="spSummary" style="display:none;">⏱ Tiempo total: —</div>
+                    <div class="tp-btns">
+                        ${isActive ? `<button class="tp-btn-cancel tp-btn-remove" onclick="removeSessionsFromCalendar('${dateKey}','${activity}')">🗑️ Quitar</button>` : `<button class="tp-btn-cancel" onclick="closeSessionPicker()">Cancelar</button>`}
+                        <button class="tp-btn-confirm" onclick="confirmSessionPicker('${dateKey}','${activity}')">✅ Guardar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            function renderBlocks(count) {
+                const wrap = document.getElementById('sessBlocks');
+                let html = '';
+                html += `<div class="sess-block">
+                    <div class="sess-title">${count === 2 ? 'Sesión 1 (más temprana)' : 'Horario'}</div>
+                    <div class="sess-row">
+                        <div><label>🕐 Inicio</label><input type="time" id="spStart1" value="${defS1}"></div>
+                        <div><label>🕐 Fin</label><input type="time" id="spEnd1" value="${defE1}"></div>
+                    </div>
+                </div>`;
+                if (count === 2) {
+                    html += `<div class="sess-block">
+                        <div class="sess-title">Sesión 2 (más tarde)</div>
+                        <div class="sess-row">
+                            <div><label>🕐 Inicio</label><input type="time" id="spStart2" value="${defS2}"></div>
+                            <div><label>🕐 Fin</label><input type="time" id="spEnd2" value="${defE2}"></div>
+                        </div>
+                    </div>`;
+                }
+                wrap.innerHTML = html;
+                ['spStart1','spEnd1','spStart2','spEnd2'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener('change', updateSummary);
+                });
+                updateSummary();
+            }
+
+            function updateSummary() {
+                const sumEl = document.getElementById('spSummary');
+                const s1 = document.getElementById('spStart1')?.value;
+                const e1 = document.getElementById('spEnd1')?.value;
+                const s2 = document.getElementById('spStart2')?.value;
+                const e2 = document.getElementById('spEnd2')?.value;
+                let totalMin = 0;
+                let parts = [];
+                if (s1 && e1) { const m = calcMinutesBetween(s1, e1); if (m > 0) { totalMin += m; parts.push(formatMinutes(m)); } }
+                if (s2 && e2) { const m = calcMinutesBetween(s2, e2); if (m > 0) { totalMin += m; parts.push(formatMinutes(m)); } }
+                if (totalMin > 0) {
+                    const exCount = estimateExerciseCount(totalMin, activity);
+                    sumEl.style.display = 'block';
+                    sumEl.innerHTML = `⏱ ${parts.join(' + ')} = ${formatMinutes(totalMin)} → <strong>~${exCount} ejercicios</strong>`;
+                    sumEl.style.color = '#059669';
+                } else {
+                    sumEl.style.display = 'none';
+                }
+            }
+
+            // Wire count picker
+            const countRow = document.getElementById('sessCountRow');
+            countRow.querySelectorAll('.sess-count-btn').forEach(btn => {
+                btn.onclick = () => {
+                    countRow.querySelectorAll('.sess-count-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    renderBlocks(+btn.dataset.count);
+                };
+            });
+
+            renderBlocks(initialCount);
+        }
+
+        function formatMinutes(mins) {
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            if (h && m) return h + 'h' + m + 'm';
+            if (h) return h + 'h';
+            return m + 'm';
+        }
+
+        function closeSessionPicker() {
+            const overlay = document.getElementById('sessionPickerOverlay');
+            if (overlay) overlay.remove();
+        }
+
+        function confirmSessionPicker(dateKey, activity) {
+            const countRow = document.getElementById('sessCountRow');
+            const selectedBtn = countRow.querySelector('.sess-count-btn.selected');
+            const count = selectedBtn ? +selectedBtn.dataset.count : 1;
+            const s1 = document.getElementById('spStart1').value;
+            const e1 = document.getElementById('spEnd1').value;
+            const m1 = calcMinutesBetween(s1, e1);
+            if (!s1 || !e1 || m1 <= 0) { alert('La hora de salida debe ser posterior a la de llegada (sesión 1).'); return; }
+            let s2 = '', e2 = '';
+            if (count === 2) {
+                s2 = document.getElementById('spStart2').value;
+                e2 = document.getElementById('spEnd2').value;
+                const m2 = calcMinutesBetween(s2, e2);
+                if (!s2 || !e2 || m2 <= 0) { alert('La hora de salida debe ser posterior a la de llegada (sesión 2).'); return; }
+                // Auto-swap if user entered them in reverse chronological order
+                if (s2 < s1) { const ts = s1, te = e1; s1 = s2; e1 = e2; s2 = ts; e2 = te; }
+            }
+
+            const wasGenerated = !!generatedWeeks[getWeekSundayForDate(new Date(+dateKey.split('-')[0], +dateKey.split('-')[1]-1, +dateKey.split('-')[2]))];
+            const wasActive = !!(calendarSchedule[dateKey] && calendarSchedule[dateKey][activity]);
+
+            if (!calendarSchedule[dateKey]) calendarSchedule[dateKey] = { weights: false, crossfit: false };
+            calendarSchedule[dateKey][activity] = true;
+            calendarSchedule[dateKey][activity + 'Start'] = s1;
+            calendarSchedule[dateKey][activity + 'End'] = e1;
+            if (count === 2) {
+                calendarSchedule[dateKey][activity + 'Start2'] = s2;
+                calendarSchedule[dateKey][activity + 'End2'] = e2;
+            } else {
+                delete calendarSchedule[dateKey][activity + 'Start2'];
+                delete calendarSchedule[dateKey][activity + 'End2'];
+            }
+            saveCalendarSchedule();
+            closeSessionPicker();
+
+            // For weights, prompt muscle groups only when activating fresh
+            if (activity === 'weights' && !wasActive) {
+                openMuscleGroupPicker(dateKey);
+            } else {
+                renderCalendar();
+                renderTodayWorkout();
+                renderWeeklyWorkouts();
+            }
+
+            if (wasGenerated && !wasActive) showRegenWarning();
+        }
+
+        function removeSessionsFromCalendar(dateKey, activity) {
+            const sched = calendarSchedule[dateKey];
+            if (!sched) { closeSessionPicker(); return; }
+            const d = new Date(+dateKey.split('-')[0], +dateKey.split('-')[1]-1, +dateKey.split('-')[2]);
+            const weekSun = getWeekSundayForDate(d);
+            const wasGenerated = !!generatedWeeks[weekSun];
+
+            sched[activity] = false;
+            delete sched[activity + 'Start'];
+            delete sched[activity + 'End'];
+            delete sched[activity + 'Start2'];
+            delete sched[activity + 'End2'];
+            if (activity === 'weights') delete sched.muscles;
+            saveCalendarSchedule();
+
+            // Un-generate if week ended up empty
+            if (wasGenerated) {
+                const sunParts = weekSun.split('-');
+                const sunDate = new Date(+sunParts[0], +sunParts[1] - 1, +sunParts[2]);
+                const monDate = new Date(sunDate); monDate.setDate(sunDate.getDate() - 6);
+                let any = false;
+                for (let i = 0; i < 7; i++) {
+                    const wd = new Date(monDate); wd.setDate(monDate.getDate() + i);
+                    const wdk = wd.getFullYear() + '-' + String(wd.getMonth()+1).padStart(2,'0') + '-' + String(wd.getDate()).padStart(2,'0');
+                    const ws = calendarSchedule[wdk] || { weights:false, crossfit:false };
+                    if (ws.weights || ws.crossfit) { any = true; break; }
+                }
+                if (!any) { delete generatedWeeks[weekSun]; saveGeneratedWeeks(); }
+            }
+
+            closeSessionPicker();
+            renderCalendar();
+            renderTodayWorkout();
+            renderWeeklyWorkouts();
+            if (wasGenerated) showRegenWarning();
+        }
+
+        // Build chronologically-ordered list of training blocks for a given day
+        function getDaySessions(dateKey) {
+            const sched = calendarSchedule[dateKey] ? calendarSchedule[dateKey] : null;
+            const baseSched = sched || (function() {
+                // Fall back to weeklySchedule for past/current weeks
+                const parts = dateKey.split('-');
+                const d = new Date(+parts[0], +parts[1]-1, +parts[2]);
+                const weekSun = getWeekSundayForDate(d);
+                const todayWeekSun = getWeekSundayForDate(new Date());
+                if (weekSun > todayWeekSun) return null;
+                const dow = d.getDay();
+                return weeklySchedule[dow] || null;
+            })();
+            if (!baseSched) return [];
+            const sessions = [];
+            const eff = sched || baseSched;
+            if (eff.weights) {
+                sessions.push({ type: 'weights', start: eff.weightsStart || '', end: eff.weightsEnd || '', sessionIdx: 1, totalSessions: eff.weightsStart2 ? 2 : 1 });
+                if (eff.weightsStart2 && eff.weightsEnd2) {
+                    sessions.push({ type: 'weights', start: eff.weightsStart2, end: eff.weightsEnd2, sessionIdx: 2, totalSessions: 2 });
+                }
+            }
+            if (eff.crossfit) {
+                sessions.push({ type: 'crossfit', start: eff.crossfitStart || '', end: eff.crossfitEnd || '', sessionIdx: 1, totalSessions: eff.crossfitStart2 ? 2 : 1 });
+                if (eff.crossfitStart2 && eff.crossfitEnd2) {
+                    sessions.push({ type: 'crossfit', start: eff.crossfitStart2, end: eff.crossfitEnd2, sessionIdx: 2, totalSessions: 2 });
+                }
+            }
+            sessions.sort((a, b) => {
+                const sa = a.start || '99:99';
+                const sb = b.start || '99:99';
+                return sa.localeCompare(sb);
+            });
+            return sessions;
+        }
+
         function openMuscleGroupPicker(dateKey) {
             const dateParts = dateKey.split('-');
             const dateObj = new Date(+dateParts[0], +dateParts[1] - 1, +dateParts[2]);
@@ -2933,6 +3212,7 @@
             const overlay = document.getElementById('musclePickerOverlay');
             if (overlay) overlay.remove();
             renderCalendar();
+            try { renderTodayWorkout(); renderWeeklyWorkouts(); } catch(e) {}
         }
 
         function confirmMuscleGroupPicker(dateKey) {
@@ -3030,17 +3310,30 @@
                 if (fullSched.weightsStart && fullSched.weightsEnd) {
                     wMins = calcMinutesBetween(fullSched.weightsStart, fullSched.weightsEnd);
                 }
+                if (fullSched.weightsStart2 && fullSched.weightsEnd2) {
+                    wMins += calcMinutesBetween(fullSched.weightsStart2, fullSched.weightsEnd2);
+                }
                 if (fullSched.crossfitStart && fullSched.crossfitEnd) {
                     cfMins = calcMinutesBetween(fullSched.crossfitStart, fullSched.crossfitEnd);
                 }
+                if (fullSched.crossfitStart2 && fullSched.crossfitEnd2) {
+                    cfMins += calcMinutesBetween(fullSched.crossfitStart2, fullSched.crossfitEnd2);
+                }
+
+                const wTime1 = fullSched.weightsStart ? `${fullSched.weightsStart}-${fullSched.weightsEnd}` : '';
+                const wTime2 = fullSched.weightsStart2 ? `${fullSched.weightsStart2}-${fullSched.weightsEnd2}` : '';
+                const cfTime1 = fullSched.crossfitStart ? `${fullSched.crossfitStart}-${fullSched.crossfitEnd}` : '';
+                const cfTime2 = fullSched.crossfitStart2 ? `${fullSched.crossfitStart2}-${fullSched.crossfitEnd2}` : '';
 
                 dayTimeData[dow] = {
                     weights: sched.weights,
                     crossfit: sched.crossfit,
                     weightsMinutes: wMins,
                     crossfitMinutes: cfMins,
-                    weightsTime: fullSched.weightsStart ? `${fullSched.weightsStart}-${fullSched.weightsEnd}` : '',
-                    crossfitTime: fullSched.crossfitStart ? `${fullSched.crossfitStart}-${fullSched.crossfitEnd}` : ''
+                    weightsTime: wTime2 ? `${wTime1} y ${wTime2}` : wTime1,
+                    crossfitTime: cfTime2 ? `${cfTime1} y ${cfTime2}` : cfTime1,
+                    weightsSessions: wTime2 ? 2 : (wTime1 ? 1 : 0),
+                    crossfitSessions: cfTime2 ? 2 : (cfTime1 ? 1 : 0)
                 };
 
                 if (sched.weights || sched.crossfit) hasAnyActivity = true;
@@ -3335,13 +3628,15 @@
                     dayCell.classList.add('today');
                 }
                 
-                const wClass = schedule.weights ? 'cal-toggle w-active' : 'cal-toggle';
-                const cfClass = schedule.crossfit ? 'cal-toggle cf-active' : 'cal-toggle';
-                
-                // Time badges
+                const wClass = schedule.weights ? 'cal-toggle compact w-active' : 'cal-toggle compact';
+                const cfClass = schedule.crossfit ? 'cal-toggle compact cf-active' : 'cal-toggle compact';
+
+                // Time badges + session count badges (×2 when there are two sessions)
                 const fullSched = calendarSchedule[dateKey] || {};
-                const wTime = (schedule.weights && fullSched.weightsStart && fullSched.weightsEnd) ? `<span class="time-badge">${fullSched.weightsStart}-${fullSched.weightsEnd}</span>` : '';
-                const cfTime = (schedule.crossfit && fullSched.crossfitStart && fullSched.crossfitEnd) ? `<span class="time-badge">${fullSched.crossfitStart}-${fullSched.crossfitEnd}</span>` : '';
+                const wHasSecond = !!(fullSched.weightsStart2 && fullSched.weightsEnd2);
+                const cfHasSecond = !!(fullSched.crossfitStart2 && fullSched.crossfitEnd2);
+                const wCntBadge = (schedule.weights && wHasSecond) ? '<span class="cnt">×2</span>' : '';
+                const cfCntBadge = (schedule.crossfit && cfHasSecond) ? '<span class="cnt">×2</span>' : '';
 
                 // Auth date diagonal bars
                 let authBars = '';
@@ -3361,11 +3656,15 @@
                     ? `<div class="text-[7px] text-purple-700 font-bold leading-tight mt-0.5">${fullSched.muscles.map(m => ({back:'Esp',shoulders:'Hom',biceps:'Bíc',triceps:'Tríc',chest:'Pech',legs:'Pier'}[m]||m)).join('+')}</div>`
                     : '';
 
-                // Prominent time chips (vertical layout: start time / dash / end time)
+                // Prominent time chips (vertical layout: start time / dash / end time) — supports up to 2 sessions
                 const wChip = (schedule.weights && fullSched.weightsStart && fullSched.weightsEnd)
                     ? `<div class="cal-time-chip-wrap"><span class="cal-time-chip"><span class="t">${formatTime12hCompact(fullSched.weightsStart)}</span><span class="sep">─</span><span class="t">${formatTime12hCompact(fullSched.weightsEnd)}</span></span></div>` : '';
+                const wChip2 = (schedule.weights && wHasSecond)
+                    ? `<div class="cal-time-chip-wrap"><span class="cal-time-chip"><span class="t">${formatTime12hCompact(fullSched.weightsStart2)}</span><span class="sep">─</span><span class="t">${formatTime12hCompact(fullSched.weightsEnd2)}</span></span></div>` : '';
                 const cfChip = (schedule.crossfit && fullSched.crossfitStart && fullSched.crossfitEnd)
                     ? `<div class="cal-time-chip-wrap"><span class="cal-time-chip cf"><span class="t">${formatTime12hCompact(fullSched.crossfitStart)}</span><span class="sep">─</span><span class="t">${formatTime12hCompact(fullSched.crossfitEnd)}</span></span></div>` : '';
+                const cfChip2 = (schedule.crossfit && cfHasSecond)
+                    ? `<div class="cal-time-chip-wrap"><span class="cal-time-chip cf"><span class="t">${formatTime12hCompact(fullSched.crossfitStart2)}</span><span class="sep">─</span><span class="t">${formatTime12hCompact(fullSched.crossfitEnd2)}</span></span></div>` : '';
 
                 const isToday = date.toDateString() === today.toDateString();
                 let content = authBars;
@@ -3373,10 +3672,12 @@
                     ? `<div><span class="cal-today-num">${day}</span><span style="font-size:9px;font-weight:900;color:#006600;margin-left:2px;">HOY</span></div>`
                     : `<div class="font-bold text-gray-800 text-sm">${day}</div>`;
                 content += `<div class="cal-toggles-stack" style="margin-top:2px;">`;
-                content += `<div class="cal-toggle-row"><span class="${wClass}" onclick="event.stopPropagation();toggleCalendarDayActivity('${dateKey}','weights')">💪 Pesas${wTime}</span></div>`;
+                content += `<div class="cal-toggle-row"><span class="${wClass}" title="Pesas — toca para configurar" onclick="event.stopPropagation();openSessionPicker('${dateKey}','weights')">💪${wCntBadge}</span></div>`;
                 if (wChip) content += wChip;
-                content += `<div class="cal-toggle-row"><span class="${cfClass}" onclick="event.stopPropagation();toggleCalendarDayActivity('${dateKey}','crossfit')">🏃 Cross${cfTime}</span></div>`;
+                if (wChip2) content += wChip2;
+                content += `<div class="cal-toggle-row"><span class="${cfClass}" title="CrossFit — toca para configurar" onclick="event.stopPropagation();openSessionPicker('${dateKey}','crossfit')">🏃${cfCntBadge}</span></div>`;
                 if (cfChip) content += cfChip;
+                if (cfChip2) content += cfChip2;
                 content += `</div>`;
                 content += musclesBadge;
                 
@@ -5051,74 +5352,104 @@
             let exercises = [];
             let title = '';
             let time = '';
-            let isCrossFit = schedule.crossfit;
-            
+
+            const dk = getWorkoutDateKey();
+            const daySessions = getDaySessions(dk);
+            const wSessions = daySessions.filter(s => s.type === 'weights');
+            const cfSessions = daySessions.filter(s => s.type === 'crossfit');
+
             // Dynamic plan lookup using day name
             const MUSCLE_LABELS = { biceps: 'BÍCEPS', triceps: 'TRÍCEPS', chest: 'PECHO', back: 'ESPALDA', legs: 'PIERNAS', shoulders: 'HOMBROS' };
+            let dayPlan = null;
             if (schedule.weights) {
                 const dayName = DAY_NAMES_MAP[today];
-                const dayPlan = weeklyPlan[dayName];
+                dayPlan = weeklyPlan[dayName];
                 if (dayPlan && Array.isArray(dayPlan)) {
                     exercises = dayPlan;
                 } else if (dayPlan && typeof dayPlan === 'object') {
                     exercises = Object.values(dayPlan).filter(v => typeof v === 'object' && v.name);
                 }
-                // Build title from muscle metadata
                 const muscles = (dayPlan && dayPlan._muscles) ? dayPlan._muscles : [];
                 if (muscles.length > 0) {
                     title = '💪 ' + muscles.map(m => MUSCLE_LABELS[m] || m.toUpperCase()).join(' & ');
                 } else {
-                    title = '💪 PESAS';
-                }
-                // Time from calendar schedule
-                const todayDateKey = getDateKey(new Date());
-                const todaySched = calendarSchedule[todayDateKey] || {};
-                if (todaySched.weightsStart && todaySched.weightsEnd) {
-                    time = todaySched.weightsStart + ' - ' + todaySched.weightsEnd;
-                } else {
-                    const mins = (dayPlan && dayPlan._minutes) ? dayPlan._minutes : 90;
-                    time = `~${mins} min disponibles`;
+                    title = '💪 PESAS' + (wSessions.length > 1 ? ' ×2' : '');
                 }
             }
             if (schedule.crossfit) {
-                const todayDateKey = getDateKey(new Date());
-                const todaySched = calendarSchedule[todayDateKey] || {};
                 if (!schedule.weights) {
-                    title = '🏃 CROSSFIT';
+                    title = '🏃 CROSSFIT' + (cfSessions.length > 1 ? ' ×2' : '');
                 } else {
-                    title += ' + 🏃 CROSSFIT';
-                }
-                if (todaySched.crossfitStart && todaySched.crossfitEnd) {
-                    time += (time ? ' | CF: ' : '') + todaySched.crossfitStart + ' - ' + todaySched.crossfitEnd;
+                    title += ' + 🏃 CROSSFIT' + (cfSessions.length > 1 ? ' ×2' : '');
                 }
             }
-            
-            const dk = getWorkoutDateKey();
+            // Time = chronological list of all sessions
+            time = daySessions
+                .filter(s => s.start && s.end)
+                .map(s => (s.type === 'weights' ? '💪' : '🏃') + ' ' + formatTime12hCompact(s.start) + '–' + formatTime12hCompact(s.end))
+                .join('  ·  ');
+            if (!time && schedule.weights) {
+                const mins = (dayPlan && dayPlan._minutes) ? dayPlan._minutes : 90;
+                time = `~${mins} min disponibles`;
+            }
+
             let html = `<div class="mb-4"><h3 class="text-xl font-bold text-purple-600">${title}</h3><p class="text-gray-600">${time}</p></div>`;
             html += '<div class="space-y-3">';
-            
-            // Show weights exercises if scheduled
-            if (schedule.weights && exercises.length > 0) {
-                const enrichedExercises = await enrichExercisesWithVideoStatus(exercises);
-                enrichedExercises.forEach((ex, idx) => {
-                    const sets = enrichedExercises.length > 5 ? '4x10' : '3x10';
-                    const duration = enrichedExercises.length > 5 ? '~12 min' : '~10 min';
-                    html += renderExerciseCard(ex, idx, sets, duration, 'purple', dk);
-                });
-                
-                html += '</div>';
-                
-                // Weights summary donut
-                const weightsPct = calcDayPct(dk, enrichedExercises.length);
-                html += `<div id="weights_summary_${dk}" data-count="${enrichedExercises.length}" class="mt-4">${buildSectionSummaryHtml(weightsPct, '💪 Pesas', 'purple')}</div>`;
-            } else {
-                html += '</div>';
-            }
-            
-            // Show CrossFit section if scheduled
-            if (schedule.crossfit) {
-                html += buildCrossfitSection(dk);
-            }
+
+            const enrichedExercises = (schedule.weights && exercises.length > 0)
+                ? await enrichExercisesWithVideoStatus(exercises) : [];
+            const wSlices = wSessions.length === 2
+                ? [enrichedExercises.slice(0, Math.ceil(enrichedExercises.length / 2)), enrichedExercises.slice(Math.ceil(enrichedExercises.length / 2))]
+                : [enrichedExercises];
+
+            let weightsBlocksRendered = 0;
+            let cfBlocksRendered = 0;
+            let weightsSummaryEmitted = false;
+
+            daySessions.forEach(s => {
+                if (s.type === 'weights') {
+                    const slice = wSlices[weightsBlocksRendered] || [];
+                    const sessionLabel = wSessions.length > 1
+                        ? (s.sessionIdx === 1 ? 'Sesión 1' : 'Sesión 2') : '';
+                    const timeLbl = (s.start && s.end) ? `${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}` : '';
+                    html += `<div class="mt-2 mb-1 flex items-center gap-2 text-sm font-bold text-purple-700">
+                        <span>💪 PESAS${sessionLabel ? ' · ' + sessionLabel : ''}</span>
+                        ${timeLbl ? `<span class="cal-time-chip">${timeLbl}</span>` : ''}
+                    </div>`;
+                    if (slice.length > 0) {
+                        slice.forEach(ex => {
+                            const idx = enrichedExercises.indexOf(ex);
+                            const sets = enrichedExercises.length > 5 ? '4x10' : '3x10';
+                            const duration = enrichedExercises.length > 5 ? '~12 min' : '~10 min';
+                            html += renderExerciseCard(ex, idx, sets, duration, 'purple', dk);
+                        });
+                    } else if (wSessions.length > 1) {
+                        html += `<p class="text-xs text-gray-400 italic">Sin ejercicios asignados a esta sesión.</p>`;
+                    }
+                    weightsBlocksRendered++;
+                    if (weightsBlocksRendered === wSessions.length && enrichedExercises.length > 0 && !weightsSummaryEmitted) {
+                        const weightsPct = calcDayPct(dk, enrichedExercises.length);
+                        html += `<div id="weights_summary_${dk}" data-count="${enrichedExercises.length}" class="mt-4">${buildSectionSummaryHtml(weightsPct, '💪 Pesas', 'purple')}</div>`;
+                        weightsSummaryEmitted = true;
+                    }
+                } else if (s.type === 'crossfit') {
+                    const sessionLabel = cfSessions.length > 1
+                        ? (s.sessionIdx === 1 ? 'Sesión 1' : 'Sesión 2') : '';
+                    const timeLbl = (s.start && s.end) ? `${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}` : '';
+                    html += `<div class="mt-2 mb-1 flex items-center gap-2 text-sm font-bold text-orange-700">
+                        <span>🏃 CROSSFIT${sessionLabel ? ' · ' + sessionLabel : ''}</span>
+                        ${timeLbl ? `<span class="cal-time-chip cf">${timeLbl}</span>` : ''}
+                    </div>`;
+                    if (cfBlocksRendered === 0) {
+                        html += buildCrossfitSection(dk);
+                    } else {
+                        html += `<p class="text-xs text-gray-500 italic">Continúa con el resto de tu rutina CrossFit en esta segunda sesión.</p>`;
+                    }
+                    cfBlocksRendered++;
+                }
+            });
+
+            html += '</div>';
             
             content.innerHTML = html;
         }
@@ -5244,22 +5575,28 @@
                     continue;
                 }
                 
-                // Build time label
-                let timeLabel = '';
-                if (schedule.weights && schedule.crossfit) timeLabel = 'Pesas + CrossFit';
-                else if (schedule.weights) timeLabel = 'Pesas y musculación';
-                else timeLabel = 'CrossFit';
+                // Compute chronologically-ordered sessions for the day
+                const daySessions = getDaySessions(dk);
+                const wSessions = daySessions.filter(s => s.type === 'weights');
+                const cfSessions = daySessions.filter(s => s.type === 'crossfit');
 
-                // Build schedule time chips for the day card
-                const calSchedForChips = calendarSchedule[dk] || {};
+                // Build time label (with session counts when > 1)
+                let timeLabel = '';
+                const wPart = wSessions.length === 0 ? '' : (wSessions.length === 1 ? 'Pesas' : 'Pesas ×2');
+                const cfPart = cfSessions.length === 0 ? '' : (cfSessions.length === 1 ? 'CrossFit' : 'CrossFit ×2');
+                if (wPart && cfPart) timeLabel = wPart + ' + ' + cfPart;
+                else if (wPart) timeLabel = wPart + ' y musculación';
+                else timeLabel = cfPart;
+
+                // Build schedule time chips for the day card (in chronological order)
                 let dayTimeChipsHtml = '';
-                if (schedule.weights && calSchedForChips.weightsStart && calSchedForChips.weightsEnd) {
-                    dayTimeChipsHtml += `<span class="cal-time-chip">⏰ Pesas ${calSchedForChips.weightsStart}–${calSchedForChips.weightsEnd}</span> `;
-                }
-                if (schedule.crossfit && calSchedForChips.crossfitStart && calSchedForChips.crossfitEnd) {
-                    dayTimeChipsHtml += `<span class="cal-time-chip cf">⏰ CrossFit ${calSchedForChips.crossfitStart}–${calSchedForChips.crossfitEnd}</span>`;
-                }
-                const dayTimeChips = dayTimeChipsHtml ? `<div class="mb-2">${dayTimeChipsHtml}</div>` : '';
+                daySessions.forEach(s => {
+                    if (!s.start || !s.end) return;
+                    const cls = s.type === 'crossfit' ? 'cal-time-chip cf' : 'cal-time-chip';
+                    const lbl = s.type === 'crossfit' ? '🏃' : '💪';
+                    dayTimeChipsHtml += `<span class="${cls}">${lbl} ${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}</span> `;
+                });
+                const dayTimeChips = dayTimeChipsHtml ? `<div class="mb-2 flex flex-wrap gap-1">${dayTimeChipsHtml}</div>` : '';
                 
                 // Build muscle group badge for this day
                 const calSched = calendarSchedule[dk] || {};
@@ -5290,28 +5627,66 @@
                 `;
                 
                 let exerciseCount = 0;
-                
-                // Weights section
-                if (schedule.weights && pm.plan.length > 0) {
-                    const enrichedPlan = await enrichExercisesWithVideoStatus(pm.plan);
-                    exerciseCount = enrichedPlan.length;
-                    
-                    enrichedPlan.forEach((ex, idx) => {
-                        const sets = enrichedPlan.length > 5 ? '4x10' : '3x10';
-                        const duration = enrichedPlan.length > 5 ? '~12 min' : '~10 min';
-                        html += renderExerciseCard(ex, idx, sets, duration, color, dk);
-                    });
 
-                    // Weights summary donut
-                    const weightsPct = calcDayPct(dk, exerciseCount);
-                    html += `<div id="weights_summary_${dk}" data-count="${exerciseCount}" class="mt-3">${buildSectionSummaryHtml(weightsPct, '💪 Pesas', 'purple')}</div>`;
-                }
-                
-                // CrossFit section (already includes its own donut via buildCrossfitSection)
-                if (schedule.crossfit) {
-                    html += buildCrossfitSection(dk);
-                }
-                
+                // Render blocks in chronological order. If a type has 2 sessions, split the plan in halves.
+                const enrichedPlan = (schedule.weights && pm.plan.length > 0)
+                    ? await enrichExercisesWithVideoStatus(pm.plan) : [];
+                exerciseCount = enrichedPlan.length;
+                const wSlices = wSessions.length === 2
+                    ? [enrichedPlan.slice(0, Math.ceil(enrichedPlan.length / 2)), enrichedPlan.slice(Math.ceil(enrichedPlan.length / 2))]
+                    : [enrichedPlan];
+
+                let weightsBlocksRendered = 0;
+                let cfBlocksRendered = 0;
+                let weightsSummaryEmitted = false;
+
+                daySessions.forEach(s => {
+                    if (s.type === 'weights') {
+                        const slice = wSlices[weightsBlocksRendered] || [];
+                        const sessionLabel = wSessions.length > 1
+                            ? (s.sessionIdx === 1 ? 'Sesión 1' : 'Sesión 2')
+                            : '';
+                        const timeLbl = (s.start && s.end) ? `${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}` : '';
+                        html += `<div class="mt-2 mb-1 flex items-center gap-2 text-xs font-bold text-purple-700">
+                            <span>💪 PESAS${sessionLabel ? ' · ' + sessionLabel : ''}</span>
+                            ${timeLbl ? `<span class="cal-time-chip">${timeLbl}</span>` : ''}
+                        </div>`;
+                        if (slice.length > 0) {
+                            slice.forEach((ex) => {
+                                const idx = enrichedPlan.indexOf(ex);
+                                const sets = enrichedPlan.length > 5 ? '4x10' : '3x10';
+                                const duration = enrichedPlan.length > 5 ? '~12 min' : '~10 min';
+                                html += renderExerciseCard(ex, idx, sets, duration, color, dk);
+                            });
+                        } else if (wSessions.length > 1) {
+                            html += `<p class="text-xs text-gray-400 italic">Sin ejercicios asignados a esta sesión.</p>`;
+                        }
+                        weightsBlocksRendered++;
+                        // Emit the weights donut after the LAST weights block of the day
+                        if (weightsBlocksRendered === wSessions.length && enrichedPlan.length > 0 && !weightsSummaryEmitted) {
+                            const weightsPct = calcDayPct(dk, exerciseCount);
+                            html += `<div id="weights_summary_${dk}" data-count="${exerciseCount}" class="mt-3">${buildSectionSummaryHtml(weightsPct, '💪 Pesas', 'purple')}</div>`;
+                            weightsSummaryEmitted = true;
+                        }
+                    } else if (s.type === 'crossfit') {
+                        const sessionLabel = cfSessions.length > 1
+                            ? (s.sessionIdx === 1 ? 'Sesión 1' : 'Sesión 2')
+                            : '';
+                        const timeLbl = (s.start && s.end) ? `${formatTime12hCompact(s.start)}–${formatTime12hCompact(s.end)}` : '';
+                        html += `<div class="mt-2 mb-1 flex items-center gap-2 text-xs font-bold text-orange-700">
+                            <span>🏃 CROSSFIT${sessionLabel ? ' · ' + sessionLabel : ''}</span>
+                            ${timeLbl ? `<span class="cal-time-chip cf">${timeLbl}</span>` : ''}
+                        </div>`;
+                        // Render the CrossFit block only on the FIRST session (single block; user may split visually)
+                        if (cfBlocksRendered === 0) {
+                            html += buildCrossfitSection(dk);
+                        } else {
+                            html += `<p class="text-xs text-gray-500 italic">Continúa con el resto de tu rutina CrossFit en esta segunda sesión.</p>`;
+                        }
+                        cfBlocksRendered++;
+                    }
+                });
+
                 dayCounts[dk] = exerciseCount;
 
                 html += `
@@ -8771,5 +9146,28 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             </button>
         </div>
     </div>
+
+    <!-- ========== CROSSFIT EXERCISE LIST (combobox suggestions) ========== -->
+    <datalist id="cfExerciseList">
+        <option value="Clean">Cargada — del suelo a los hombros</option>
+        <option value="Clean and Jerk">Cargada y envión — movimiento olímpico completo</option>
+        <option value="Deadlift">Peso muerto</option>
+        <option value="Double Under">Salto doble de comba (la cuerda pasa dos veces por salto)</option>
+        <option value="Front Squat">Sentadilla frontal — barra apoyada en los hombros</option>
+        <option value="Handstand Push-Up (HSPU)">Flexiones haciendo el pino/vertical</option>
+        <option value="Kettlebell Swing">Balanceo con pesa rusa</option>
+        <option value="Knees-to-Elbows (K2E)">Rodillas a los codos colgado de la barra</option>
+        <option value="Lunges">Estocadas o zancadas</option>
+        <option value="Muscle-Up">Subida a la barra/anillas (dominada + fondo)</option>
+        <option value="Overhead Squat (OHS)">Sentadilla con la barra sobre la cabeza, brazos extendidos</option>
+        <option value="Pull-Up">Dominada clásica</option>
+        <option value="Push-Up">Flexión de brazos en el suelo</option>
+        <option value="Ring Dip">Fondo en anillas</option>
+        <option value="Snatch">Arrancada — del suelo a sobre la cabeza en un movimiento</option>
+        <option value="Sumo Deadlift High Pull">Peso muerto sumo con tirón alto al mentón</option>
+        <option value="Thruster">Sentadilla frontal + press de hombros</option>
+        <option value="Toes-to-Bar (T2B)">Pies a la barra colgado</option>
+        <option value="Wall Ball Shot">Lanzamiento de balón medicinal a la pared</option>
+    </datalist>
 </body>
 </html>
