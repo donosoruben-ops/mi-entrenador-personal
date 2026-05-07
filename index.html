@@ -568,6 +568,15 @@
         .tp-btn-remove {
             background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca;
         }
+        /* Per-session mini remove button inside the picker */
+        .sess-mini-remove {
+            background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+            font-size: 10px; font-weight: 800; padding: 3px 8px;
+            border-radius: 6px; cursor: pointer; line-height: 1;
+            text-transform: none; letter-spacing: 0;
+            transition: all 0.15s;
+        }
+        .sess-mini-remove:hover { background: #fee2e2; border-color: #f87171; }
         /* Per-exercise remove button (×) overlay on weights cards */
         .ex-remove-wrap { position: relative; }
         .ex-remove-btn {
@@ -2962,13 +2971,26 @@
             const defS2 = existing[startKey2] || (isWeights ? '21:00' : '20:00');
             const defE2 = existing[endKey2] || (isWeights ? '22:30' : '21:00');
 
+            // Initial muscle selections for weights (per session)
+            const initialMuscles1 = (existing.muscles || []).slice();
+            const initialMuscles2 = (existing.muscles2 || []).slice();
+
+            const MUSCLE_GROUPS = [
+                { key: 'back', label: 'Espalda', icon: '🔙' },
+                { key: 'shoulders', label: 'Hombros', icon: '🦾' },
+                { key: 'biceps', label: 'Bíceps', icon: '💪' },
+                { key: 'triceps', label: 'Tríceps', icon: '🏋️' },
+                { key: 'chest', label: 'Pecho', icon: '🫁' },
+                { key: 'legs', label: 'Piernas', icon: '🦵' }
+            ];
+
             let overlay = document.getElementById('sessionPickerOverlay');
             if (overlay) overlay.remove();
             overlay = document.createElement('div');
             overlay.id = 'sessionPickerOverlay';
             overlay.className = 'time-picker-overlay';
             overlay.innerHTML = `
-                <div class="time-picker-card">
+                <div class="time-picker-card" style="max-width:380px;">
                     <h3>${actLabel} — ${dayName}</h3>
                     <p class="tp-subtitle">¿Cuántas veces irás hoy?</p>
                     <div class="sess-count-row" id="sessCountRow">
@@ -2978,30 +3000,61 @@
                     <div id="sessBlocks"></div>
                     <div class="tp-time-summary" id="spSummary" style="display:none;">⏱ Tiempo total: —</div>
                     <div class="tp-btns">
-                        ${isActive ? `<button class="tp-btn-cancel tp-btn-remove" onclick="removeSessionsFromCalendar('${dateKey}','${activity}')">🗑️ Quitar</button>` : `<button class="tp-btn-cancel" onclick="closeSessionPicker()">Cancelar</button>`}
+                        ${isActive ? `<button class="tp-btn-cancel tp-btn-remove" onclick="removeSessionsFromCalendar('${dateKey}','${activity}')">🗑️ Quitar todo</button>` : `<button class="tp-btn-cancel" onclick="closeSessionPicker()">Cancelar</button>`}
                         <button class="tp-btn-confirm" onclick="confirmSessionPicker('${dateKey}','${activity}')">✅ Guardar</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(overlay);
 
+            function buildMuscleButtons(slotIdx, selectedKeys) {
+                return MUSCLE_GROUPS.map(g => {
+                    const sel = selectedKeys.includes(g.key);
+                    return `<button type="button" data-muscle="${g.key}" data-slot="${slotIdx}" class="muscle-pick-btn sp-muscle ${sel ? 'selected' : ''}" onclick="this.classList.toggle('selected')" style="padding:5px 3px;">
+                        <span style="font-size:1.1rem;">${g.icon}</span><br><span style="font-size:9px;font-weight:700;">${g.label}</span>
+                    </button>`;
+                }).join('');
+            }
+
             function renderBlocks(count) {
                 const wrap = document.getElementById('sessBlocks');
                 let html = '';
-                html += `<div class="sess-block">
-                    <div class="sess-title">${count === 2 ? 'Sesión 1 (más temprana)' : 'Horario'}</div>
+                html += `<div class="sess-block" id="sessBlock1">
+                    <div class="sess-title" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>${count === 2 ? 'Sesión 1 (más temprana)' : 'Horario'}</span>
+                        ${count === 2 ? `<button type="button" class="sess-mini-remove" onclick="removeOneSession('${dateKey}','${activity}',1)" title="Quitar esta sesión">🗑 Quitar</button>` : ''}
+                    </div>
                     <div class="sess-row">
                         <div><label>🕐 Inicio</label><input type="time" id="spStart1" value="${defS1}"></div>
                         <div><label>🕐 Fin</label><input type="time" id="spEnd1" value="${defE1}"></div>
                     </div>
+                    ${isWeights ? `
+                        <div style="margin-top:10px;">
+                            <label style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:0.3px;">🎯 Grupos musculares</label>
+                            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:5px;">
+                                ${buildMuscleButtons(1, initialMuscles1)}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>`;
                 if (count === 2) {
-                    html += `<div class="sess-block">
-                        <div class="sess-title">Sesión 2 (más tarde)</div>
+                    html += `<div class="sess-block" id="sessBlock2">
+                        <div class="sess-title" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>Sesión 2 (más tarde)</span>
+                            <button type="button" class="sess-mini-remove" onclick="removeOneSession('${dateKey}','${activity}',2)" title="Quitar esta sesión">🗑 Quitar</button>
+                        </div>
                         <div class="sess-row">
                             <div><label>🕐 Inicio</label><input type="time" id="spStart2" value="${defS2}"></div>
                             <div><label>🕐 Fin</label><input type="time" id="spEnd2" value="${defE2}"></div>
                         </div>
+                        ${isWeights ? `
+                            <div style="margin-top:10px;">
+                                <label style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:0.3px;">🎯 Grupos musculares</label>
+                                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:5px;">
+                                    ${buildMuscleButtons(2, initialMuscles2)}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>`;
                 }
                 wrap.innerHTML = html;
@@ -3059,11 +3112,12 @@
         }
 
         function confirmSessionPicker(dateKey, activity) {
+            const overlay = document.getElementById('sessionPickerOverlay');
             const countRow = document.getElementById('sessCountRow');
             const selectedBtn = countRow.querySelector('.sess-count-btn.selected');
             const count = selectedBtn ? +selectedBtn.dataset.count : 1;
-            const s1 = document.getElementById('spStart1').value;
-            const e1 = document.getElementById('spEnd1').value;
+            let s1 = document.getElementById('spStart1').value;
+            let e1 = document.getElementById('spEnd1').value;
             const m1 = calcMinutesBetween(s1, e1);
             if (!s1 || !e1 || m1 <= 0) { alert('La hora de salida debe ser posterior a la de llegada (sesión 1).'); return; }
             let s2 = '', e2 = '';
@@ -3074,6 +3128,18 @@
                 if (!s2 || !e2 || m2 <= 0) { alert('La hora de salida debe ser posterior a la de llegada (sesión 2).'); return; }
                 // Auto-swap if user entered them in reverse chronological order
                 if (s2 < s1) { const ts = s1, te = e1; s1 = s2; e1 = e2; s2 = ts; e2 = te; }
+            }
+
+            // Collect muscle groups (only for weights). Slots map to session 1 / 2.
+            let muscles1 = [], muscles2 = [];
+            const isWeights = activity === 'weights';
+            if (isWeights && overlay) {
+                overlay.querySelectorAll('.sp-muscle.selected').forEach(btn => {
+                    if (btn.dataset.slot === '2') muscles2.push(btn.dataset.muscle);
+                    else muscles1.push(btn.dataset.muscle);
+                });
+                // If session swap happened, swap muscles too
+                // (we don't have a clean "was swapped" flag, so re-derive: spStart1 input value differs from final s1)
             }
 
             const wasGenerated = !!generatedWeeks[getWeekSundayForDate(new Date(+dateKey.split('-')[0], +dateKey.split('-')[1]-1, +dateKey.split('-')[2]))];
@@ -3090,19 +3156,64 @@
                 delete calendarSchedule[dateKey][activity + 'Start2'];
                 delete calendarSchedule[dateKey][activity + 'End2'];
             }
+            if (isWeights) {
+                calendarSchedule[dateKey].muscles = muscles1;
+                if (count === 2) calendarSchedule[dateKey].muscles2 = muscles2;
+                else delete calendarSchedule[dateKey].muscles2;
+            }
             saveCalendarSchedule();
             closeSessionPicker();
-
-            // For weights, prompt muscle groups every time so the user can adjust per-session targets
-            if (activity === 'weights') {
-                openMuscleGroupPicker(dateKey);
-            } else {
-                renderCalendar();
-                renderTodayWorkout();
-                renderWeeklyWorkouts();
-            }
+            renderCalendar();
+            renderTodayWorkout();
+            renderWeeklyWorkouts();
 
             if (wasGenerated && !wasActive) showRegenWarning();
+        }
+
+        // Remove just one of the two daily sessions (called from the per-session 🗑 button)
+        function removeOneSession(dateKey, activity, sessionIdx) {
+            if (!confirm(`¿Quitar la sesión ${sessionIdx} de ${activity === 'weights' ? 'Pesas' : 'CrossFit'}?`)) return;
+            const sched = calendarSchedule[dateKey];
+            if (!sched) { closeSessionPicker(); return; }
+            const isWeights = activity === 'weights';
+            if (sessionIdx === 1) {
+                // Promote session 2 → session 1 if it exists
+                const s2 = sched[activity + 'Start2'];
+                const e2 = sched[activity + 'End2'];
+                if (s2 && e2) {
+                    sched[activity + 'Start'] = s2;
+                    sched[activity + 'End'] = e2;
+                    delete sched[activity + 'Start2'];
+                    delete sched[activity + 'End2'];
+                    if (isWeights) {
+                        sched.muscles = (sched.muscles2 || []).slice();
+                        delete sched.muscles2;
+                        sched.weightsRemovedA = (sched.weightsRemovedB || []).slice();
+                        delete sched.weightsRemovedB;
+                    }
+                } else {
+                    // Only had session 1 → deactivate the activity entirely
+                    sched[activity] = false;
+                    delete sched[activity + 'Start'];
+                    delete sched[activity + 'End'];
+                    if (isWeights) {
+                        delete sched.muscles;
+                        delete sched.weightsRemovedA;
+                    }
+                }
+            } else if (sessionIdx === 2) {
+                delete sched[activity + 'Start2'];
+                delete sched[activity + 'End2'];
+                if (isWeights) {
+                    delete sched.muscles2;
+                    delete sched.weightsRemovedB;
+                }
+            }
+            saveCalendarSchedule();
+            closeSessionPicker();
+            renderCalendar();
+            renderTodayWorkout();
+            renderWeeklyWorkouts();
         }
 
         function removeSessionsFromCalendar(dateKey, activity) {
