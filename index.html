@@ -3533,6 +3533,11 @@
                 const cfTime1 = fullSched.crossfitStart ? `${fullSched.crossfitStart}-${fullSched.crossfitEnd}` : '';
                 const cfTime2 = fullSched.crossfitStart2 ? `${fullSched.crossfitStart2}-${fullSched.crossfitEnd2}` : '';
 
+                // Pre-selected muscle groups by the user (per session)
+                const muscles1 = (fullSched.muscles || []).slice();
+                const muscles2 = (fullSched.muscles2 || []).slice();
+                const allMuscles = Array.from(new Set([...muscles1, ...muscles2]));
+
                 dayTimeData[dow] = {
                     weights: sched.weights,
                     crossfit: sched.crossfit,
@@ -3541,7 +3546,10 @@
                     weightsTime: wTime2 ? `${wTime1} y ${wTime2}` : wTime1,
                     crossfitTime: cfTime2 ? `${cfTime1} y ${cfTime2}` : cfTime1,
                     weightsSessions: wTime2 ? 2 : (wTime1 ? 1 : 0),
-                    crossfitSessions: cfTime2 ? 2 : (cfTime1 ? 1 : 0)
+                    crossfitSessions: cfTime2 ? 2 : (cfTime1 ? 1 : 0),
+                    muscles: muscles1,
+                    muscles2: muscles2,
+                    allMuscles: allMuscles
                 };
 
                 if (sched.weights || sched.crossfit) hasAnyActivity = true;
@@ -3876,9 +3884,12 @@
 
                 const isToday = date.toDateString() === today.toDateString();
                 let content = authBars;
+                // The day number is also a clear "go to day" link (so the user has an
+                // explicit, larger tap target than the cell's empty space).
+                const goLink = `<span style="float:right;font-size:9px;color:#7c3aed;font-weight:900;cursor:pointer;" title="Ir al día">→</span>`;
                 content += isToday
-                    ? `<div><span class="cal-today-num">${day}</span><span style="font-size:9px;font-weight:900;color:#006600;margin-left:2px;">HOY</span></div>`
-                    : `<div class="font-bold text-gray-800 text-sm">${day}</div>`;
+                    ? `<div onclick="event.stopPropagation();showDayWorkout(new Date(${date.getFullYear()},${date.getMonth()},${date.getDate()}))" style="cursor:pointer;"><span class="cal-today-num">${day}</span><span style="font-size:9px;font-weight:900;color:#006600;margin-left:2px;">HOY</span>${goLink}</div>`
+                    : `<div onclick="event.stopPropagation();showDayWorkout(new Date(${date.getFullYear()},${date.getMonth()},${date.getDate()}))" class="font-bold text-gray-800 text-sm" style="cursor:pointer;">${day}${goLink}</div>`;
                 content += `<div class="cal-toggles-stack" style="margin-top:2px;">`;
                 content += `<div class="cal-toggle-row"><span class="${wClass}" title="Pesas — toca para configurar" onclick="event.stopPropagation();openSessionPicker('${dateKey}','weights')">💪${wCntBadge}</span></div>`;
                 content += `<div class="cal-toggle-row"><span class="${cfClass}" title="CrossFit — toca para configurar" onclick="event.stopPropagation();openSessionPicker('${dateKey}','crossfit')">🏃${cfCntBadge}</span></div>`;
@@ -3930,22 +3941,35 @@
             _weekAnchorDateKey = dateKey;
             _weekOffset = 0;
             await renderWeeklyWorkouts();
+            // Wait one paint so the freshly-injected DOM has layout
+            await new Promise(r => requestAnimationFrame(r));
 
             const el = document.getElementById('weekDay_' + dateKey);
             const container = document.getElementById('workoutContainer');
-            if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            // After page scroll settles, snap horizontal scroll to the start (clicked day is first card)
-            setTimeout(() => {
-                if (container) {
-                    container.scrollTo({ left: 0, behavior: 'smooth' });
-                }
-                if (el) {
-                    el.classList.remove('day-highlight');
-                    void el.offsetWidth;
-                    el.classList.add('day-highlight');
-                    setTimeout(() => el.classList.remove('day-highlight'), 2500);
-                }
-            }, 400);
+
+            // Scroll the page vertically to bring the carousel into view
+            if (container) {
+                try { container.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+                catch(e) { container.scrollIntoView(true); }
+            }
+
+            // Scroll the carousel horizontally to the clicked day's card.
+            // Anchor mode places it as the first card (left:0), but compute offsetLeft anyway
+            // so this still works if anchor mode wasn't applied.
+            if (el && container) {
+                const target = Math.max(0, el.offsetLeft - container.offsetLeft);
+                try { container.scrollTo({ left: target, behavior: 'smooth' }); }
+                catch(e) { container.scrollLeft = target; }
+            }
+
+            // Pulse highlight
+            if (el) {
+                el.classList.remove('day-highlight');
+                void el.offsetWidth;
+                el.classList.add('day-highlight');
+                setTimeout(() => el.classList.remove('day-highlight'), 2500);
+            }
+
             const dayName = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
             showSyncToast('📅 Yendo a ' + dayName.charAt(0).toUpperCase() + dayName.slice(1));
         }
@@ -6271,22 +6295,18 @@
             const objectives = athleteObjectives;
             const priorities = parseObjectivePriorities(objectives.text);
 
-            // Collect per-day muscle selections from calendarSchedule
+            // Collect per-day muscle selections — prefer the values already attached to dayTimeData
+            // (these were derived directly from the calendarSchedule entry of the upcoming week's date,
+            //  including muscles2 when there are two sessions).
             const dayMuscleSelections = {};
             if (dayTimeData) {
                 for (const [dow, info] of Object.entries(dayTimeData)) {
-                    // Find the dateKey for this dow in the upcoming week
-                    const sundayKey = Object.keys(generatedWeeks).sort().pop();
-                    if (info.weights) {
-                        // Check calendarSchedule for muscle selection
-                        for (const [dk, sched] of Object.entries(calendarSchedule)) {
-                            if (sched.muscles && sched.muscles.length > 0) {
-                                const d = parseDateKey(dk);
-                                if (d.getDay() === parseInt(dow)) {
-                                    dayMuscleSelections[dow] = sched.muscles;
-                                }
-                            }
-                        }
+                    if (info && info.weights) {
+                        const all = (info.allMuscles && info.allMuscles.length > 0)
+                            ? info.allMuscles
+                            : ((info.muscles || []).concat(info.muscles2 || []));
+                        const unique = Array.from(new Set(all));
+                        if (unique.length > 0) dayMuscleSelections[dow] = unique;
                     }
                 }
             }
@@ -8326,12 +8346,23 @@ Escribe exactamente 3-4 oraciones en español, tono cercano (tuteo). Sé MUY esp
                 const names = (exList || []).map(e => `"${e.name}" (equipo: ${e.equipment})`).join(', ');
                 catalogLines.push(`${muscle}: ${names}`);
             }
-            // Build day plan description
+            // Build day plan description with PRE-SELECTED muscle groups
             const spNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+            const MUSCLE_LABELS_ES = { back: 'espalda', shoulders: 'hombros', biceps: 'bíceps', triceps: 'tríceps', chest: 'pecho', legs: 'piernas' };
             const dayDescs = Object.entries(dayTimeData || {}).map(([dow, info]) => {
                 const n = spNames[parseInt(dow)];
-                if (info.weights) return `${n}: Pesas ${info.weightsMinutes} min`;
-                if (info.crossfit) return `${n}: CrossFit (sin pesas)`;
+                if (info.weights) {
+                    const m1 = (info.muscles || []).map(k => MUSCLE_LABELS_ES[k] || k);
+                    const m2 = (info.muscles2 || []).map(k => MUSCLE_LABELS_ES[k] || k);
+                    let mtxt = '';
+                    if (info.weightsSessions === 2) {
+                        mtxt = ` — Sesión 1 grupos: [${m1.join(', ') || 'no especificados'}]; Sesión 2 grupos: [${m2.join(', ') || 'no especificados'}]`;
+                    } else {
+                        mtxt = ` — grupos musculares: [${m1.join(', ') || 'no especificados'}]`;
+                    }
+                    return `${n}: Pesas ${info.weightsMinutes} min${info.weightsSessions === 2 ? ' (en 2 sesiones)' : ''}${mtxt}`;
+                }
+                if (info.crossfit) return `${n}: CrossFit (sin pesas)${info.crossfitSessions === 2 ? ' (en 2 sesiones)' : ''}`;
                 return `${n}: Descanso`;
             });
             const equipList = (athleteEquipment || []).map(e => `${e.name} (${e.type})`).join(', ') || 'equipamiento básico de gimnasio';
@@ -8346,7 +8377,9 @@ DATOS DEL ATLETA:
 - Equipamiento disponible: ${equipList}
 - Videos que le inspiran: ${videoPrefs}
 - Ejercicios de semanas anteriores (VARIAR): ${prevEx || 'ninguno'}
-- Plan de la semana (incluye minutos disponibles): ${dayDescs.join(' | ')}
+
+PLAN DE LA SEMANA (CON GRUPOS MUSCULARES YA ELEGIDOS POR EL USUARIO):
+${dayDescs.join('\n')}
 
 CATÁLOGO DE EJERCICIOS POR MÚSCULO (USAR SOLO ESTOS):
 ${catalogLines.join('\n')}
@@ -8358,18 +8391,21 @@ FÓRMULA PARA CALCULAR SERIES/REPS SEGÚN TIEMPO:
 - Más tiempo = más series posibles (4-5 series) o más ejercicios
 - Ajusta series y reps inteligentemente: no repitas el mismo esquema en todos los días
 
-INSTRUCCIONES:
-1. Solo usa ejercicios del catálogo
-2. Considera el equipamiento disponible — NO pongas ejercicios sin el equipo necesario
-3. Para cada día de pesas: elige 2 grupos musculares y calcula cuántos ejercicios REALMENTE caben en el tiempo disponible
-4. Asigna series y reps realistas basadas en el tiempo
-5. Escribe una nota motivadora corta (1-2 oraciones) por ejercicio explicando por qué está en el plan y cuál es el objetivo
-6. Para días sin pesas: lista vacía
-7. Varía los ejercicios respecto a semanas anteriores
-8. Prioriza según los objetivos del atleta
+INSTRUCCIONES (CRÍTICAS):
+1. **RESPETAR ESTRICTAMENTE LOS GRUPOS MUSCULARES** que el usuario eligió para cada día. NO añadas grupos musculares que el usuario no haya seleccionado. Si el usuario eligió "bíceps, tríceps, pecho", TODOS los ejercicios de ese día deben ser de bíceps, tríceps o pecho — ni piernas, ni espalda, ni hombros.
+2. Si un día tiene 2 sesiones de pesas con grupos distintos: incluye ejercicios de AMBOS grupos en la lista de ese día (la app los dividirá automáticamente entre las sesiones según el campo \`muscle\` de cada ejercicio). Cada ejercicio debe declarar su \`muscle\` exacto (uno de: back, shoulders, biceps, triceps, chest, legs).
+3. Si el usuario NO especificó grupos musculares para un día de pesas ("no especificados"), entonces tú eliges 2 grupos sensatos según rotación semanal y objetivos.
+4. Solo usa ejercicios del catálogo
+5. Considera el equipamiento disponible — NO pongas ejercicios sin el equipo necesario
+6. Calcula cuántos ejercicios REALMENTE caben en el tiempo disponible
+7. Asigna series y reps realistas basadas en el tiempo
+8. Escribe una nota motivadora corta (1-2 oraciones) por ejercicio explicando por qué está en el plan y cuál es el objetivo
+9. Para días sin pesas: lista vacía
+10. Varía los ejercicios respecto a semanas anteriores
+11. Prioriza según los objetivos del atleta
 
-Responde SOLO con JSON válido, sin texto adicional, exactamente con este formato:
-{"plan":{"Lunes":{"minutes":90,"muscles":["biceps","triceps"],"exercises":[{"name":"Curl con Barra","sets":4,"reps":10,"note":"Bíceps con barra para máxima activación. 4 series de 10 reps con el peso que te permita mantener forma perfecta."}]},"Martes":{"minutes":0,"muscles":[],"exercises":[]},"Miércoles":{"minutes":75,"muscles":["chest","back"],"exercises":[{"name":"Press de Banca","sets":3,"reps":12,"note":"Pecho con barra, base de fuerza. Controla la bajada en 2 segundos."}]},"Jueves":{"minutes":0,"muscles":[],"exercises":[]},"Viernes":{"minutes":90,"muscles":["legs","shoulders"],"exercises":[{"name":"Sentadilla con Barra","sets":4,"reps":8,"note":"Pierna completa. 4 series pesadas, este es el ejercicio rey del día."}]},"Sábado":{"minutes":0,"muscles":[],"exercises":[]},"Domingo":{"minutes":0,"muscles":[],"exercises":[]}}}`;
+Responde SOLO con JSON válido, sin texto adicional, exactamente con este formato (NOTA: cada ejercicio debe incluir el campo "muscle"):
+{"plan":{"Lunes":{"minutes":90,"muscles":["biceps","triceps"],"exercises":[{"name":"Curl con Barra","muscle":"biceps","sets":4,"reps":10,"note":"Bíceps con barra para máxima activación. 4 series de 10 reps con el peso que te permita mantener forma perfecta."}]},"Martes":{"minutes":0,"muscles":[],"exercises":[]},"Miércoles":{"minutes":75,"muscles":["chest","back"],"exercises":[{"name":"Press de Banca","muscle":"chest","sets":3,"reps":12,"note":"Pecho con barra, base de fuerza. Controla la bajada en 2 segundos."}]},"Jueves":{"minutes":0,"muscles":[],"exercises":[]},"Viernes":{"minutes":90,"muscles":["legs","shoulders"],"exercises":[{"name":"Sentadilla con Barra","muscle":"legs","sets":4,"reps":8,"note":"Pierna completa. 4 series pesadas, este es el ejercicio rey del día."}]},"Sábado":{"minutes":0,"muscles":[],"exercises":[]},"Domingo":{"minutes":0,"muscles":[],"exercises":[]}}}`;
 
             try {
                 const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -8408,15 +8444,28 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                 const dayKey = SPANISH_DAY_TO_KEY[spDay.toLowerCase()] || SPANISH_DAY_TO_KEY[normalized];
                 if (!dayKey) continue;
 
-                // Exercises may be objects {name, sets, reps, note} or plain strings (fallback)
+                const dow = spDayNames.indexOf(spDay);
+                const dtd = (dow >= 0) ? (dayTimeData?.[dow] || {}) : {};
+                // Honor pre-selected muscle groups: the union of session 1 + session 2
+                const allowedMuscles = (dtd.allMuscles && dtd.allMuscles.length > 0) ? new Set(dtd.allMuscles) : null;
+
+                // Exercises may be objects {name, sets, reps, note, muscle} or plain strings (fallback)
                 const rawExercises = dayInfo.exercises || [];
                 const exercises = rawExercises
                     .map(item => {
                         const name = typeof item === 'string' ? item : item.name;
                         const entry = lookup[name] || lookup[(name||'').toLowerCase()];
                         if (!entry) return null;
+                        // Prefer the AI-declared muscle, fall back to catalog's muscle
+                        const muscle = (typeof item === 'object' && item.muscle) ? item.muscle : entry.muscle;
+                        // GUARDRAIL: drop exercises that don't match the user-selected muscles
+                        if (allowedMuscles && !allowedMuscles.has(muscle)) {
+                            console.warn('[AI guardrail] dropping exercise', name, 'muscle', muscle, 'not in allowed', [...allowedMuscles]);
+                            return null;
+                        }
                         return {
                             ...entry,
+                            muscle: muscle,
                             videoIndex: Math.floor(Math.random() * Math.max(1, (entry.videos || []).length)),
                             _aiSets: typeof item === 'object' ? (item.sets || 4) : 4,
                             _aiReps: typeof item === 'object' ? (item.reps || 10) : 10,
@@ -8427,8 +8476,8 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
 
                 newPlan[dayKey] = exercises;
                 if (exercises.length > 0) {
-                    newPlan[dayKey]._muscles = dayInfo.muscles || [];
-                    const dow = spDayNames.indexOf(spDay);
+                    // Use the user's pre-selected groups when available; otherwise trust the AI
+                    newPlan[dayKey]._muscles = (dtd.allMuscles && dtd.allMuscles.length > 0) ? dtd.allMuscles.slice() : (dayInfo.muscles || []);
                     if (dow >= 0 && dayTimeData?.[dow]) newPlan[dayKey]._minutes = dayTimeData[dow].weightsMinutes || 90;
                     else if (dayInfo.minutes) newPlan[dayKey]._minutes = dayInfo.minutes;
                 }
