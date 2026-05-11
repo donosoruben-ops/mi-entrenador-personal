@@ -1283,9 +1283,10 @@
             <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
                 <h3 class="font-bold text-purple-800 text-sm mb-1"><i class="fas fa-robot mr-1"></i>Claude AI — API Key</h3>
                 <p class="text-[10px] text-purple-600 mb-2">Pega tu API key de Anthropic para activar mensajes motivadores personalizados y generación inteligente de planes. Se guarda cifrado en Firebase.</p>
-                <div class="flex gap-2 items-center mb-2">
-                    <input type="password" id="claudeApiKeyInput" placeholder="sk-ant-api03-..." class="flex-1 border border-purple-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono">
+                <div class="flex gap-2 items-center mb-2 flex-wrap">
+                    <input type="password" id="claudeApiKeyInput" placeholder="sk-ant-api03-..." class="flex-1 min-w-[180px] border border-purple-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono">
                     <button type="button" onclick="saveClaudeApiKey()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-4 py-2 rounded-lg font-semibold flex-shrink-0">Guardar</button>
+                    <button type="button" onclick="clearClaudeApiKey()" title="Borrar la API key guardada" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0"><i class="fas fa-trash mr-1"></i>Borrar</button>
                 </div>
                 <div class="flex gap-2 items-center mb-1">
                     <label class="text-[11px] font-semibold text-purple-700 flex-shrink-0"><i class="fas fa-brain mr-1"></i>Modelo:</label>
@@ -1421,6 +1422,9 @@
                     <input type="password" id="claudeApiKeyInputApp" placeholder="sk-ant-api03-..." class="flex-1 min-w-[180px] border border-purple-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono">
                     <button type="button" onclick="saveClaudeApiKeyApp()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-4 py-2 rounded-lg font-semibold flex-shrink-0">
                         <i class="fas fa-save mr-1"></i>Guardar
+                    </button>
+                    <button type="button" onclick="clearClaudeApiKeyApp()" title="Borrar la API key guardada (útil si te equivocaste)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0">
+                        <i class="fas fa-trash mr-1"></i>Borrar
                     </button>
                 </div>
                 <div class="flex gap-2 items-center mb-1 flex-wrap">
@@ -8048,6 +8052,30 @@
             await testClaudeConnection();
             _syncStatusToApp();
             _refreshAiBadge();
+        }
+
+        // Borra la API key de memoria, localStorage, Firebase y limpia los dos inputs.
+        async function clearClaudeApiKey() {
+            const confirmar = confirm('¿Borrar la API key de Claude?\n\nSe quitará de Firebase y de este navegador. Tendrás que pegarla y guardarla de nuevo para usar la IA.');
+            if (!confirmar) return;
+            _claudeApiKey = null;
+            try { originalSetItem('boxi_claude_key', ''); } catch(e) {}
+            try { localStorage.removeItem('boxi_claude_key'); } catch(e) {}
+            if (firebaseDB) {
+                try { await firebaseDB.ref('settings/claudeApiKey').remove(); } catch(e) {}
+            }
+            const inAdmin = document.getElementById('claudeApiKeyInput');
+            const inApp = document.getElementById('claudeApiKeyInputApp');
+            if (inAdmin) inAdmin.value = '';
+            if (inApp) inApp.value = '';
+            const statusAdmin = document.getElementById('claudeKeyStatus');
+            if (statusAdmin) { statusAdmin.innerHTML = '🗑 API key borrada. Pega una nueva y guarda para reactivar.'; statusAdmin.style.color = '#dc2626'; }
+            _syncStatusToApp();
+            _refreshAiBadge();
+        }
+        async function clearClaudeApiKeyApp() {
+            // Mismo flujo — pero el confirm queda en clearClaudeApiKey()
+            await clearClaudeApiKey();
         }
 
         async function saveClaudeModel() {
