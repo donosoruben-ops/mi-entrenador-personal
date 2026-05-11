@@ -1283,9 +1283,20 @@
             <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
                 <h3 class="font-bold text-purple-800 text-sm mb-1"><i class="fas fa-robot mr-1"></i>Claude AI — API Key</h3>
                 <p class="text-[10px] text-purple-600 mb-2">Pega tu API key de Anthropic para activar mensajes motivadores personalizados y generación inteligente de planes. Se guarda cifrado en Firebase.</p>
-                <div class="flex gap-2 items-center">
+                <div class="flex gap-2 items-center mb-2">
                     <input type="password" id="claudeApiKeyInput" placeholder="sk-ant-api03-..." class="flex-1 border border-purple-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono">
                     <button type="button" onclick="saveClaudeApiKey()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-4 py-2 rounded-lg font-semibold flex-shrink-0">Guardar</button>
+                </div>
+                <div class="flex gap-2 items-center mb-1">
+                    <label class="text-[11px] font-semibold text-purple-700 flex-shrink-0"><i class="fas fa-brain mr-1"></i>Modelo:</label>
+                    <select id="claudeModelSelect" onchange="saveClaudeModel()" class="flex-1 border border-purple-300 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-purple-500 bg-white">
+                        <option value="claude-haiku-4-5-20251001">⚡ Haiku 4.5 — rápido y económico (recomendado)</option>
+                        <option value="claude-sonnet-4-6">🎯 Sonnet 4.6 — equilibrado, calidad alta</option>
+                        <option value="claude-opus-4-7">🧠 Opus 4.7 — máxima calidad, más lento y caro</option>
+                    </select>
+                    <button type="button" onclick="testClaudeConnection()" title="Probar conexión con Claude" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0">
+                        <i class="fas fa-plug mr-1"></i>Conectar
+                    </button>
                 </div>
                 <p id="claudeKeyStatus" class="text-[10px] mt-1 text-purple-500"></p>
             </div>
@@ -1391,6 +1402,39 @@
                 <div><span id="syncUserId" style="font-size:9px;color:#9ca3af;font-family:monospace;"></span></div>
                 <span id="syncStatusText" style="font-size:10px;color:#6b7280;">🔄 Conectando...</span>
                 <button onclick="forceSyncFromFirebase()" style="font-size:10px;background:#7c3aed;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:6px;cursor:pointer;font-weight:700;">↻ Sincronizar</button>
+            </div>
+        </div>
+
+        <!-- ========== Estado IA / API Key Claude (visible en el resumen del usuario) ========== -->
+        <div class="bg-purple-50 border-2 border-purple-200 rounded-xl p-3 mb-4 max-w-4xl mx-auto shadow-sm">
+            <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-robot text-purple-700"></i>
+                    <strong class="text-purple-900 text-sm">IA que está corriendo:</strong>
+                    <span id="appAiBadge" class="text-xs font-semibold px-2 py-1 rounded-full bg-purple-200 text-purple-900">— sin conectar —</span>
+                </div>
+                <button type="button" onclick="toggleAiPanelApp()" id="appAiToggleBtn" class="text-[10px] bg-purple-200 hover:bg-purple-300 text-purple-900 px-2 py-1 rounded-lg font-semibold">⚙ Configurar</button>
+            </div>
+            <div id="appAiPanel" style="display:none;">
+                <p class="text-[10px] text-purple-700 mb-2">Pega tu API key de Anthropic (sk-ant-...) y elige el modelo. Se guarda cifrado en Firebase y aplica a todos los planes de IA.</p>
+                <div class="flex gap-2 items-center mb-2 flex-wrap">
+                    <input type="password" id="claudeApiKeyInputApp" placeholder="sk-ant-api03-..." class="flex-1 min-w-[180px] border border-purple-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500 font-mono">
+                    <button type="button" onclick="saveClaudeApiKeyApp()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-4 py-2 rounded-lg font-semibold flex-shrink-0">
+                        <i class="fas fa-save mr-1"></i>Guardar
+                    </button>
+                </div>
+                <div class="flex gap-2 items-center mb-1 flex-wrap">
+                    <label class="text-[11px] font-semibold text-purple-700 flex-shrink-0"><i class="fas fa-brain mr-1"></i>Modelo:</label>
+                    <select id="claudeModelSelectApp" onchange="saveClaudeModelApp()" class="flex-1 min-w-[160px] border border-purple-300 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-purple-500 bg-white">
+                        <option value="claude-haiku-4-5-20251001">⚡ Haiku 4.5 — rápido y económico</option>
+                        <option value="claude-sonnet-4-6">🎯 Sonnet 4.6 — equilibrado</option>
+                        <option value="claude-opus-4-7">🧠 Opus 4.7 — máxima calidad</option>
+                    </select>
+                    <button type="button" onclick="testClaudeConnectionApp()" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex-shrink-0">
+                        <i class="fas fa-plug mr-1"></i>Conectar
+                    </button>
+                </div>
+                <p id="claudeKeyStatusApp" class="text-[10px] mt-1 text-purple-500"></p>
             </div>
         </div>
 
@@ -3580,8 +3624,15 @@
 
             // ---- Try Claude AI plan generation ----
             let usedAI = false;
+            const loadingMsg = _claudeApiKey
+                ? 'Creando tu semana con toda la información'
+                : 'Creando tu semana de entrenamiento';
+            const loadingSubtitle = _claudeApiKey
+                ? 'La IA está pensando en tu plan personalizado…'
+                : 'Armando tu planificación con tu perfil…';
+            showAILoadingOverlay(loadingMsg, loadingSubtitle);
+
             if (_claudeApiKey) {
-                showSyncToast('🤖 IA analizando tu perfil completo...');
                 try {
                     const aiPlan = await generateWeekWithClaude(dayTimeData);
                     if (aiPlan) {
@@ -3626,6 +3677,7 @@
                 aiDetails.hasNutrition = !!(typeof nutritionRecords !== 'undefined' && nutritionRecords && Object.keys(nutritionRecords).length > 0);
                 aiDetails.hasProgress = !!(workoutProgress && Object.keys(workoutProgress).length > 0);
             }
+            hideAILoadingOverlay();
             showWeekGeneratedModal(usedAI, aiDetails);
             showSyncToast(usedAI ? '🤖 Semana generada con IA y guardada en servidor' : '✅ Planificación generada y guardada en servidor');
         }
@@ -7035,6 +7087,68 @@
             setTimeout(() => { toast.style.opacity = '0'; toast.style.top = '0'; }, 3500);
         }
 
+        // Loading overlay con engranaje girando mientras la IA "piensa"
+        function showAILoadingOverlay(message, subtitle) {
+            hideAILoadingOverlay();
+            const overlay = document.createElement('div');
+            overlay.id = 'aiLoadingOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:999998;display:flex;align-items:center;justify-content:center;padding:20px;animation:popIn 0.25s ease-out;';
+            const phrases = [
+                'Revisando tus objetivos personales…',
+                'Considerando tus implementos disponibles…',
+                'Analizando tus videos favoritos…',
+                'Mirando tu historial de progreso y pesos…',
+                'Cruzando datos con tu registro nutricional…',
+                'Ajustando series y reps a tu tiempo disponible…',
+                'Eligiendo los mejores ejercicios para ti…'
+            ];
+            overlay.innerHTML = `
+                <div style="background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border-radius:20px;padding:32px 26px;max-width:420px;width:100%;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.5);">
+                    <div style="font-size:4.5rem;line-height:1;margin-bottom:14px;">
+                        <i class="fas fa-cog" style="animation:spin 2.4s linear infinite;display:inline-block;"></i>
+                    </div>
+                    <h2 style="font-size:1.15rem;font-weight:900;margin-bottom:8px;letter-spacing:0.3px;">${message || 'Creando tu semana con toda la información'}</h2>
+                    <p id="aiLoadingSubtitle" style="font-size:0.82rem;opacity:0.92;line-height:1.5;min-height:38px;transition:opacity 0.4s;">${subtitle || phrases[0]}</p>
+                    <div style="display:flex;justify-content:center;gap:6px;margin-top:14px;">
+                        <span class="ai-dot" style="width:8px;height:8px;background:#fff;border-radius:50%;opacity:0.4;animation:aiDotPulse 1.2s infinite;animation-delay:0s;"></span>
+                        <span class="ai-dot" style="width:8px;height:8px;background:#fff;border-radius:50%;opacity:0.4;animation:aiDotPulse 1.2s infinite;animation-delay:0.2s;"></span>
+                        <span class="ai-dot" style="width:8px;height:8px;background:#fff;border-radius:50%;opacity:0.4;animation:aiDotPulse 1.2s infinite;animation-delay:0.4s;"></span>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // Asegurar keyframes para los puntos (solo se inyecta una vez)
+            if (!document.getElementById('aiLoadingKeyframes')) {
+                const style = document.createElement('style');
+                style.id = 'aiLoadingKeyframes';
+                style.textContent = '@keyframes aiDotPulse { 0%,80%,100% { opacity:0.3; transform:scale(0.8);} 40% { opacity:1; transform:scale(1.2);} }';
+                document.head.appendChild(style);
+            }
+
+            // Rotar subtítulo mientras está visible
+            let idx = 0;
+            const sub = document.getElementById('aiLoadingSubtitle');
+            overlay._phraseInterval = setInterval(() => {
+                if (!sub) return;
+                sub.style.opacity = '0';
+                setTimeout(() => {
+                    idx = (idx + 1) % phrases.length;
+                    sub.textContent = phrases[idx];
+                    sub.style.opacity = '1';
+                }, 350);
+            }, 1800);
+        }
+
+        function hideAILoadingOverlay() {
+            const overlay = document.getElementById('aiLoadingOverlay');
+            if (!overlay) return;
+            if (overlay._phraseInterval) clearInterval(overlay._phraseInterval);
+            overlay.style.transition = 'opacity 0.3s';
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 300);
+        }
+
         // =============================================
         // ADMIN BROADCAST / FORCE UPDATE SYSTEM
         // =============================================
@@ -7281,6 +7395,9 @@
 
         // ADMIN PANEL
         function renderAdminPanel() {
+            // Reflejar el modelo Claude actualmente guardado en el selector
+            const modelSel = document.getElementById('claudeModelSelect');
+            if (modelSel && _claudeModel) modelSel.value = _claudeModel;
             const users = getBoxiUsers();
             const list = document.getElementById('adminUserList');
             const entries = Object.values(users);
@@ -7850,21 +7967,136 @@
         // CLAUDE API + MOTIVATION SYSTEM
         // =============================================
         let _claudeApiKey = null;
+        let _claudeModel = 'claude-haiku-4-5-20251001'; // default: rápido y económico
         let _motivShownKeys = {}; // phase+date → true
         let _motivAutoDismissTimer = null;
         let _motivProgressTimer = null;
         let _motivCheckInterval = null;
 
-        // ---- API Key management ----
+        // ---- API Key + Model management ----
         async function loadClaudeApiKey() {
             // Try Firebase first, fall back to localStorage
             if (firebaseDB) {
                 try {
                     const snap = await firebaseDB.ref('settings/claudeApiKey').once('value');
-                    if (snap.val()) { _claudeApiKey = snap.val(); return; }
+                    if (snap.val()) _claudeApiKey = snap.val();
+                    const modelSnap = await firebaseDB.ref('settings/claudeModel').once('value');
+                    if (modelSnap.val()) _claudeModel = modelSnap.val();
                 } catch(e) {}
             }
-            _claudeApiKey = originalGetItem('boxi_claude_key') || null;
+            if (!_claudeApiKey) _claudeApiKey = originalGetItem('boxi_claude_key') || null;
+            const localModel = originalGetItem('boxi_claude_model');
+            if (localModel) _claudeModel = localModel;
+            // Reflejar modelo en los selects (admin + resumen del usuario) y en el badge
+            const sel = document.getElementById('claudeModelSelect');
+            if (sel) sel.value = _claudeModel;
+            const selApp = document.getElementById('claudeModelSelectApp');
+            if (selApp) selApp.value = _claudeModel;
+            if (typeof _refreshAiBadge === 'function') _refreshAiBadge();
+        }
+
+        // ─── Wrappers para el panel IA en el resumen del usuario (screenApp) ───
+        // Reutilizan las funciones del admin, sincronizando los inputs y propagando el status.
+        const _AI_MODEL_LABELS = {
+            'claude-haiku-4-5-20251001': 'Haiku 4.5 ⚡',
+            'claude-sonnet-4-6': 'Sonnet 4.6 🎯',
+            'claude-opus-4-7': 'Opus 4.7 🧠'
+        };
+        function _syncStatusToApp() {
+            const src = document.getElementById('claudeKeyStatus');
+            const dst = document.getElementById('claudeKeyStatusApp');
+            if (src && dst) { dst.innerHTML = src.innerHTML; dst.style.color = src.style.color; }
+        }
+        function _refreshAiBadge() {
+            const badge = document.getElementById('appAiBadge');
+            if (!badge) return;
+            if (_claudeApiKey) {
+                badge.textContent = (_AI_MODEL_LABELS[_claudeModel] || _claudeModel) + ' ✓';
+                badge.classList.remove('bg-purple-200', 'text-purple-900');
+                badge.classList.add('bg-green-200', 'text-green-900');
+            } else {
+                badge.textContent = '— sin conectar —';
+                badge.classList.remove('bg-green-200', 'text-green-900');
+                badge.classList.add('bg-purple-200', 'text-purple-900');
+            }
+        }
+        function toggleAiPanelApp() {
+            const p = document.getElementById('appAiPanel');
+            if (!p) return;
+            p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+            // Sincronizar valores actuales hacia los inputs del usuario al abrir
+            const selApp = document.getElementById('claudeModelSelectApp');
+            if (selApp) selApp.value = _claudeModel;
+        }
+        async function saveClaudeApiKeyApp() {
+            const inApp = document.getElementById('claudeApiKeyInputApp');
+            const inAdmin = document.getElementById('claudeApiKeyInput');
+            if (inApp && inAdmin) inAdmin.value = inApp.value;
+            await saveClaudeApiKey();
+            _syncStatusToApp();
+            _refreshAiBadge();
+        }
+        async function saveClaudeModelApp() {
+            const selApp = document.getElementById('claudeModelSelectApp');
+            const selAdmin = document.getElementById('claudeModelSelect');
+            if (selApp && selAdmin) selAdmin.value = selApp.value;
+            await saveClaudeModel();
+            _syncStatusToApp();
+            _refreshAiBadge();
+        }
+        async function testClaudeConnectionApp() {
+            await testClaudeConnection();
+            _syncStatusToApp();
+            _refreshAiBadge();
+        }
+
+        async function saveClaudeModel() {
+            const sel = document.getElementById('claudeModelSelect');
+            if (!sel) return;
+            _claudeModel = sel.value;
+            originalSetItem('boxi_claude_model', _claudeModel);
+            if (firebaseDB) {
+                try { await firebaseDB.ref('settings/claudeModel').set(_claudeModel); } catch(e) {}
+            }
+            const status = document.getElementById('claudeKeyStatus');
+            if (status) {
+                const labels = {
+                    'claude-haiku-4-5-20251001': 'Haiku 4.5 ⚡',
+                    'claude-sonnet-4-6': 'Sonnet 4.6 🎯',
+                    'claude-opus-4-7': 'Opus 4.7 🧠'
+                };
+                status.innerHTML = '✅ Modelo cambiado a <strong>' + (labels[_claudeModel] || _claudeModel) + '</strong>. Las próximas generaciones lo usarán.';
+                status.style.color = '#16a34a';
+            }
+        }
+
+        async function testClaudeConnection() {
+            const status = document.getElementById('claudeKeyStatus');
+            if (!_claudeApiKey) {
+                if (status) { status.textContent = '❌ Primero guarda una API key.'; status.style.color = '#dc2626'; }
+                return;
+            }
+            if (status) { status.textContent = '🔌 Probando conexión con ' + _claudeModel + '...'; status.style.color = '#7c3aed'; }
+            try {
+                const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'x-api-key': _claudeApiKey,
+                        'anthropic-version': '2023-06-01',
+                        'content-type': 'application/json',
+                        'anthropic-dangerous-direct-browser-access': 'true'
+                    },
+                    body: JSON.stringify({ model: _claudeModel, max_tokens: 10, messages: [{ role: 'user', content: 'Responde solo: ok' }] })
+                });
+                if (resp.ok) {
+                    if (status) { status.innerHTML = '✅ <strong>Conectado con Claude (' + _claudeModel + ')</strong> — listo para generar planes 🚀'; status.style.color = '#16a34a'; }
+                } else {
+                    const err = await resp.json().catch(() => ({}));
+                    if (status) { status.textContent = '❌ Error ' + resp.status + ': ' + (err.error?.message || 'modelo o key inválida'); status.style.color = '#dc2626'; }
+                }
+            } catch(e) {
+                if (status) { status.textContent = '❌ Sin conexión a Anthropic: ' + e.message; status.style.color = '#dc2626'; }
+            }
         }
 
         async function saveClaudeApiKey() {
@@ -7895,7 +8127,7 @@
                         'content-type': 'application/json',
                         'anthropic-dangerous-direct-browser-access': 'true'
                     },
-                    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 5, messages: [{ role: 'user', content: 'ok' }] })
+                    body: JSON.stringify({ model: _claudeModel, max_tokens: 5, messages: [{ role: 'user', content: 'ok' }] })
                 });
                 if (testResp.ok) {
                     status.innerHTML = '✅ <strong>API key guardada y conectada correctamente con Claude AI</strong> — generación inteligente y mensajes motivadores activados 🤖';
@@ -7988,7 +8220,7 @@ Escribe UN mensaje motivador muy corto (2-3 oraciones máximo) para darle ánimo
                         'anthropic-dangerous-direct-browser-access': 'true'
                     },
                     body: JSON.stringify({
-                        model: 'claude-haiku-4-5-20251001',
+                        model: _claudeModel,
                         max_tokens: 120,
                         messages: [{ role: 'user', content: prompt }]
                     })
@@ -8204,7 +8436,7 @@ Escribe exactamente 3-4 oraciones en español, tono cercano (tuteo). Sé MUY esp
                 const resp = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': _claudeApiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-                    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 220, messages: [{ role: 'user', content: prompt }] })
+                    body: JSON.stringify({ model: _claudeModel, max_tokens: 220, messages: [{ role: 'user', content: prompt }] })
                 });
 
                 if (!resp.ok) throw new Error('Claude ' + resp.status);
@@ -8346,7 +8578,7 @@ Escribe exactamente 3-4 oraciones en español, tono cercano (tuteo). Sé MUY esp
                 const names = (exList || []).map(e => `"${e.name}" (equipo: ${e.equipment})`).join(', ');
                 catalogLines.push(`${muscle}: ${names}`);
             }
-            // Build day plan description with PRE-SELECTED muscle groups
+            // Build day plan description with PRE-SELECTED muscle groups + HORARIOS reales
             const spNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
             const MUSCLE_LABELS_ES = { back: 'espalda', shoulders: 'hombros', biceps: 'bíceps', triceps: 'tríceps', chest: 'pecho', legs: 'piernas' };
             const dayDescs = Object.entries(dayTimeData || {}).map(([dow, info]) => {
@@ -8354,34 +8586,154 @@ Escribe exactamente 3-4 oraciones en español, tono cercano (tuteo). Sé MUY esp
                 if (info.weights) {
                     const m1 = (info.muscles || []).map(k => MUSCLE_LABELS_ES[k] || k);
                     const m2 = (info.muscles2 || []).map(k => MUSCLE_LABELS_ES[k] || k);
+                    const horario = info.weightsTime ? ` [Horario: ${info.weightsTime}]` : '';
                     let mtxt = '';
                     if (info.weightsSessions === 2) {
                         mtxt = ` — Sesión 1 grupos: [${m1.join(', ') || 'no especificados'}]; Sesión 2 grupos: [${m2.join(', ') || 'no especificados'}]`;
                     } else {
                         mtxt = ` — grupos musculares: [${m1.join(', ') || 'no especificados'}]`;
                     }
-                    return `${n}: Pesas ${info.weightsMinutes} min${info.weightsSessions === 2 ? ' (en 2 sesiones)' : ''}${mtxt}`;
+                    const cfPart = info.crossfit ? ` + CrossFit ${info.crossfitMinutes} min${info.crossfitTime ? ' ('+info.crossfitTime+')' : ''}` : '';
+                    return `${n}: Pesas ${info.weightsMinutes} min${info.weightsSessions === 2 ? ' (en 2 sesiones)' : ''}${horario}${mtxt}${cfPart}`;
                 }
-                if (info.crossfit) return `${n}: CrossFit (sin pesas)${info.crossfitSessions === 2 ? ' (en 2 sesiones)' : ''}`;
+                if (info.crossfit) {
+                    const horarioCF = info.crossfitTime ? ` [Horario: ${info.crossfitTime}]` : '';
+                    return `${n}: CrossFit ${info.crossfitMinutes} min (sin pesas)${info.crossfitSessions === 2 ? ' (en 2 sesiones)' : ''}${horarioCF}`;
+                }
                 return `${n}: Descanso`;
             });
             const equipList = (athleteEquipment || []).map(e => `${e.name} (${e.type})`).join(', ') || 'equipamiento básico de gimnasio';
-            const videoPrefs = (athleteVideoLinks || []).map(v => v.note).join(', ') || 'ninguno';
-            let prevEx = '';
-            try { prevEx = (collectWeeklySummary().exerciseHistory || []).slice(0, 12).join(', '); } catch(e) {}
+            const videoPrefs = (athleteVideoLinks || [])
+                .map(v => v.note ? (v.note + (v.url ? ' ['+v.url+']' : '')) : '')
+                .filter(Boolean).join(' | ') || 'ninguno';
 
-            const prompt = `Eres un entrenador personal experto. Genera una planificación semanal de pesas COMPLETAMENTE PERSONALIZADA.
+            // ====== INFORMACIÓN RICA: progreso, pesos por ejercicio, nutrición ======
+            let summary = null;
+            try { summary = collectWeeklySummary(); } catch(e) { summary = null; }
+            const prevEx = summary ? (summary.exerciseHistory || []).slice(0, 15).join(', ') : '';
 
-DATOS DEL ATLETA:
-- Objetivos: ${athleteObjectives.text || 'mejorar condición física general'}
-- Equipamiento disponible: ${equipList}
-- Videos que le inspiran: ${videoPrefs}
-- Ejercicios de semanas anteriores (VARIAR): ${prevEx || 'ninguno'}
+            // Performance por grupo muscular en la semana anterior
+            let musclePerfTxt = 'sin datos previos';
+            if (summary && summary.musclePerformance) {
+                const rows = Object.entries(summary.musclePerformance)
+                    .filter(([,mp]) => mp.count > 0)
+                    .map(([m, mp]) => `${MUSCLE_LABELS_ES[m] || m}: ${mp.avgPct}% completado (${mp.count} ejercicios)`);
+                if (rows.length) musclePerfTxt = rows.join(' | ');
+            }
 
-PLAN DE LA SEMANA (CON GRUPOS MUSCULARES YA ELEGIDOS POR EL USUARIO):
+            // Pesos reales últimos usados por ejercicio (para progresión)
+            const weightsByExercise = {};
+            try {
+                const wp = workoutProgress || {};
+                const sortedDks = Object.keys(wp).sort();
+                for (const dk of sortedDks) {
+                    const day = wp[dk] || {};
+                    for (const idx in day) {
+                        const p = day[idx];
+                        if (!p || !p._exerciseName) continue;
+                        const w = p.doneWeight || p.goalWeight;
+                        if (!w) continue;
+                        weightsByExercise[p._exerciseName] = {
+                            weight: w,
+                            unit: p.doneUnit || p.goalUnit || 'kg',
+                            sets: p.doneSets || p.goalSets,
+                            reps: p.doneReps || p.goalReps,
+                            date: dk
+                        };
+                    }
+                }
+            } catch(e) {}
+            const lastWeightsList = Object.entries(weightsByExercise)
+                .slice(-20)
+                .map(([name, d]) => `${name}: ${d.weight}${d.unit} × ${d.sets}×${d.reps} (${d.date})`)
+                .join(' | ') || 'sin pesos registrados aún';
+
+            // Nutrición / composición corporal
+            let nutTxt = 'sin datos nutricionales';
+            try {
+                const nc = getNutritionContext();
+                if (nc.hasData) {
+                    const parts = [];
+                    if (nc.fatPct != null) parts.push(`%Grasa: ${nc.fatPct}%${nc.fatTrend ? ' ('+nc.fatTrend+')' : ''}`);
+                    if (nc.musclePct != null) parts.push(`%Músculo: ${nc.musclePct}%${nc.muscleTrend ? ' ('+nc.muscleTrend+')' : ''}`);
+                    if (nc.fatKg != null) parts.push(`Grasa: ${nc.fatKg}kg`);
+                    if (nc.muscleKg != null) parts.push(`Músculo: ${nc.muscleKg}kg`);
+                    if (parts.length) nutTxt = parts.join(' | ') + ` (medición: ${nc.date})`;
+                }
+            } catch(e) {}
+
+            // Análisis nutricional textual reciente (de los registros con análisis)
+            let analisisNut = '';
+            try {
+                const nutKeys = Object.keys(nutritionRecords || {})
+                    .filter(k => nutritionRecords[k]?.analysis)
+                    .sort()
+                    .slice(-2);
+                analisisNut = nutKeys.map(k => {
+                    const a = nutritionRecords[k].analysis;
+                    return typeof a === 'string' ? a.substring(0, 180) : '';
+                }).filter(Boolean).join(' || ');
+            } catch(e) {}
+
+            // Prioridades extraídas del texto de objetivos
+            let priosTxt = '';
+            try {
+                const p = parseObjectivePriorities(athleteObjectives.text || '');
+                const active = Object.entries(p).filter(([,v]) => v).map(([k]) => k);
+                if (active.length) priosTxt = active.join(', ');
+            } catch(e) {}
+
+            // Cantidad de implementos por tipo
+            const equipCount = (athleteEquipment || []).length;
+            const videosCount = (athleteVideoLinks || []).length;
+
+            const prompt = `Eres un entrenador personal experto. Genera una planificación semanal de pesas COMPLETAMENTE PERSONALIZADA usando TODA la información del atleta que está abajo.
+
+═══════════════════════════════════════
+PERFIL COMPLETO DEL ATLETA
+═══════════════════════════════════════
+
+🎯 OBJETIVOS PERSONALES (lo que el usuario escribió textualmente):
+"${athleteObjectives.text || 'mejorar condición física general'}"
+${priosTxt ? `Prioridades detectadas en sus objetivos: ${priosTxt}` : ''}
+
+🏋️ EQUIPAMIENTO DISPONIBLE (${equipCount} implementos registrados):
+${equipList}
+⚠️ NO sugieras ejercicios que requieran equipo que el atleta no tiene.
+
+🎥 VIDEOS DE REFERENCIA / EJERCICIOS FAVORITOS (${videosCount}):
+${videoPrefs}
+→ Si hay videos guardados, prioriza ejercicios similares/relacionados a esas referencias.
+
+📊 PERFORMANCE SEMANA ANTERIOR (% de completitud por grupo muscular):
+${musclePerfTxt}
+${summary ? `Promedio general pesas: ${summary.overallWeightsPct}% | Días completados: ${summary.daysCompleted}/${summary.totalDays}` : ''}
+→ Grupos con menos del 50% → reduce volumen o cambia ejercicios (puede ser muy difícil).
+→ Grupos arriba del 80% → mantén o sube intensidad/peso/series.
+
+💪 PESOS REALES QUE ESTÁ MOVIENDO (historial reciente por ejercicio):
+${lastWeightsList}
+→ Cuando repitas un ejercicio del historial, asume que puede usar peso similar.
+→ Cuando varíes a un ejercicio nuevo del mismo grupo, ajusta reps a lo que su nivel sugiere.
+
+🥗 NUTRICIÓN / COMPOSICIÓN CORPORAL:
+${nutTxt}
+${analisisNut ? `Análisis nutricional reciente: ${analisisNut}` : ''}
+→ Si está en déficit/bajando grasa: prioriza intensidad y mantener masa muscular (peso alto, reps moderadas 8-10).
+→ Si está en superávit/ganando músculo: volumen alto, 4-5 series, reps 8-12, ejercicios compuestos.
+→ Si solo busca recomposición: balance entre fuerza (4-6 reps) e hipertrofia (8-12).
+
+🔁 EJERCICIOS DE SEMANAS ANTERIORES (VARIAR — no repetir todos):
+${prevEx || 'ninguno'}
+
+═══════════════════════════════════════
+PLAN DE LA PRÓXIMA SEMANA (CON HORARIOS Y GRUPOS YA ELEGIDOS POR EL USUARIO):
+═══════════════════════════════════════
 ${dayDescs.join('\n')}
 
+═══════════════════════════════════════
 CATÁLOGO DE EJERCICIOS POR MÚSCULO (USAR SOLO ESTOS):
+═══════════════════════════════════════
 ${catalogLines.join('\n')}
 
 FÓRMULA PARA CALCULAR SERIES/REPS SEGÚN TIEMPO:
@@ -8397,12 +8749,16 @@ INSTRUCCIONES (CRÍTICAS):
 3. Si el usuario NO especificó grupos musculares para un día de pesas ("no especificados"), entonces tú eliges 2 grupos sensatos según rotación semanal y objetivos.
 4. Solo usa ejercicios del catálogo
 5. Considera el equipamiento disponible — NO pongas ejercicios sin el equipo necesario
-6. Calcula cuántos ejercicios REALMENTE caben en el tiempo disponible
-7. Asigna series y reps realistas basadas en el tiempo
-8. Escribe una nota motivadora corta (1-2 oraciones) por ejercicio explicando por qué está en el plan y cuál es el objetivo
-9. Para días sin pesas: lista vacía
-10. Varía los ejercicios respecto a semanas anteriores
-11. Prioriza según los objetivos del atleta
+6. Calcula cuántos ejercicios REALMENTE caben en el tiempo disponible (revisa el horario indicado)
+7. Asigna series y reps realistas basadas en el tiempo Y en el nivel demostrado por sus pesos previos
+8. **PROGRESIÓN INTELIGENTE**: si el atleta completó un ejercicio al 80%+ la semana pasada, sube series o sugiere subir reps. Si quedó por debajo del 50%, mantén o baja volumen.
+9. **USAR LOS PESOS HISTÓRICOS**: en la nota motivadora menciona pesos concretos cuando exista historial (ej: "la semana pasada hiciste 60kg, busca llegar a 62kg hoy").
+10. **USAR LA NUTRICIÓN**: si está bajando grasa, prioriza compuestos e intensidad. Si está ganando músculo, sube volumen. Refleja esta lógica en las notas motivadoras.
+11. **USAR LOS OBJETIVOS LITERALES** del usuario: cuando elijas un ejercicio relacionado con su meta escrita (ej: si menciona "brazos más fuertes" y eliges curl), menciónalo en la nota.
+12. Escribe una nota motivadora corta (1-2 oraciones) por ejercicio explicando POR QUÉ está en el plan en función del perfil del atleta (objetivos, progreso, nutrición o pesos previos — no genérica).
+13. Para días sin pesas: lista vacía
+14. Varía los ejercicios respecto a semanas anteriores (no repitas TODOS los mismos)
+15. Prioriza según los objetivos del atleta y las prioridades detectadas
 
 Responde SOLO con JSON válido, sin texto adicional, exactamente con este formato (NOTA: cada ejercicio debe incluir el campo "muscle"):
 {"plan":{"Lunes":{"minutes":90,"muscles":["biceps","triceps"],"exercises":[{"name":"Curl con Barra","muscle":"biceps","sets":4,"reps":10,"note":"Bíceps con barra para máxima activación. 4 series de 10 reps con el peso que te permita mantener forma perfecta."}]},"Martes":{"minutes":0,"muscles":[],"exercises":[]},"Miércoles":{"minutes":75,"muscles":["chest","back"],"exercises":[{"name":"Press de Banca","muscle":"chest","sets":3,"reps":12,"note":"Pecho con barra, base de fuerza. Controla la bajada en 2 segundos."}]},"Jueves":{"minutes":0,"muscles":[],"exercises":[]},"Viernes":{"minutes":90,"muscles":["legs","shoulders"],"exercises":[{"name":"Sentadilla con Barra","muscle":"legs","sets":4,"reps":8,"note":"Pierna completa. 4 series pesadas, este es el ejercicio rey del día."}]},"Sábado":{"minutes":0,"muscles":[],"exercises":[]},"Domingo":{"minutes":0,"muscles":[],"exercises":[]}}}`;
@@ -8417,8 +8773,8 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                         'anthropic-dangerous-direct-browser-access': 'true'
                     },
                     body: JSON.stringify({
-                        model: 'claude-haiku-4-5-20251001',
-                        max_tokens: 2500,
+                        model: _claudeModel,
+                        max_tokens: 4000,
                         messages: [{ role: 'user', content: prompt }]
                     })
                 });
