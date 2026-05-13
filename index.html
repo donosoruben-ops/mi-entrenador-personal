@@ -8,9 +8,9 @@
     <meta http-equiv="Expires" content="0">
     <title>Mi Entrenador Personal Pro</title>
     <script>
-    // Force cache bust — v38
+    // Force cache bust — v49
     (function(){
-        var V='38';
+        var V='50';
         var u=new URL(window.location.href);
         if(u.searchParams.get('_v')!==V){
             u.searchParams.set('_v',V);
@@ -705,34 +705,58 @@
                 width: 86vw;
             }
         }
-        /* Per-exercise BOXI help button: collapsed shows just the glove, expands on hover/focus */
+        /* Per-exercise BOXI help button: compact, expands DOWNWARD on hover/focus (never sideways) */
         .boxi-help-ex-btn {
-            display: inline-flex; align-items: center; justify-content: flex-start;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
             background: linear-gradient(135deg, #2d1b69, #1a1040);
             color: #ccff00; border: 2px solid rgba(204,255,0,0.55);
-            border-radius: 999px; padding: 5px 7px;
+            border-radius: 12px; padding: 5px 6px 3px;
             font-weight: 900; cursor: pointer;
-            margin-top: 6px; gap: 0;
+            margin-top: 6px; width: 68px;
             box-shadow: 0 2px 8px rgba(124,58,237,0.35);
-            overflow: hidden; max-width: 34px;
-            transition: max-width 0.35s cubic-bezier(0.4,0,0.2,1), gap 0.25s, padding 0.25s;
+            overflow: hidden;
+            transition: padding 0.25s, box-shadow 0.25s;
             -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-            white-space: nowrap;
+            line-height: 1;
         }
-        .boxi-help-ex-btn .glove { font-size: 15px; line-height: 1; flex-shrink: 0; }
+        .boxi-help-ex-btn .glove { font-size: 17px; line-height: 1; flex-shrink: 0; }
         .boxi-help-ex-btn .lbl {
-            font-size: 10px; letter-spacing: 0.04em;
-            opacity: 0; transition: opacity 0.2s ease 0.1s;
+            font-size: 8px; letter-spacing: 0.02em;
+            margin-top: 3px;
             text-shadow: 0 0 8px rgba(204,255,0,0.4);
+            text-align: center; line-height: 1.15;
+            white-space: normal; word-break: break-word;
         }
         .boxi-help-ex-btn:hover, .boxi-help-ex-btn:focus, .boxi-help-ex-btn.boxi-help-open {
-            max-width: 220px; gap: 6px; padding: 5px 12px 5px 9px;
             box-shadow: 0 4px 14px rgba(124,58,237,0.5), 0 0 14px rgba(204,255,0,0.3);
         }
-        .boxi-help-ex-btn:hover .lbl, .boxi-help-ex-btn:focus .lbl, .boxi-help-ex-btn.boxi-help-open .lbl {
-            opacity: 1;
-        }
         .boxi-help-ex-btn:active { transform: scale(0.95); }
+
+        /* Swap exercise button — mismo patrón que el de BOXI pero color naranja */
+        .swap-ex-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            background: linear-gradient(135deg, #f97316, #c2410c);
+            color: #fff7ed; border: 2px solid rgba(255,237,213,0.55);
+            border-radius: 12px; padding: 5px 6px 3px;
+            font-weight: 900; cursor: pointer;
+            margin-top: 6px; width: 68px;
+            box-shadow: 0 2px 8px rgba(234,88,12,0.35);
+            overflow: hidden;
+            transition: padding 0.25s, box-shadow 0.25s;
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+            line-height: 1;
+        }
+        .swap-ex-btn .ico { font-size: 17px; line-height: 1; flex-shrink: 0; }
+        .swap-ex-btn .lbl {
+            font-size: 8px; letter-spacing: 0.02em;
+            margin-top: 3px;
+            text-align: center; line-height: 1.15;
+            white-space: normal; word-break: break-word;
+        }
+        .swap-ex-btn:hover, .swap-ex-btn:focus, .swap-ex-btn.swap-open {
+            box-shadow: 0 4px 14px rgba(234,88,12,0.5);
+        }
+        .swap-ex-btn:active { transform: scale(0.95); }
         .week-day-column.today-week-card {
             border: 3px solid #00cc00 !important;
             box-shadow: 0 0 0 3px #ccff00, 0 0 18px 4px rgba(170,255,0,0.7), 0 0 32px 8px rgba(0,255,0,0.3) !important;
@@ -997,12 +1021,19 @@
         #boxiPanel.boxi-visible { transform: translateY(0); }
         #boxiCloseBtn {
             position: absolute; top: 10px; right: 14px;
-            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
-            color: #a78bfa; font-size: 14px;
-            width: 28px; height: 28px; border-radius: 50%;
-            cursor: pointer; padding: 0; line-height: 28px; text-align: center;
+            background: rgba(220,38,38,0.85); border: 2px solid rgba(255,255,255,0.55);
+            color: #fff; font-size: 18px; font-weight: 900;
+            width: 40px; height: 40px; border-radius: 50%;
+            cursor: pointer; padding: 0; line-height: 36px; text-align: center;
+            z-index: 9200; box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+            transition: transform 0.1s, background 0.15s;
         }
-        #boxiCloseBtn:hover { background: rgba(255,255,255,0.18); }
+        #boxiCloseBtn:hover { background: rgba(239,68,68,0.95); transform: scale(1.05); }
+        #boxiCloseBtn:active { transform: scale(0.94); }
+        @media (min-width: 768px) {
+            #boxiCloseBtn { width: 46px; height: 46px; font-size: 20px; line-height: 42px; top: 14px; right: 18px; }
+        }
         #boxiBackToTodayBtn {
             display: inline-flex; align-items: center; justify-content: center;
             background: linear-gradient(135deg, #ccff00, #84cc16);
@@ -1035,6 +1066,42 @@
             font-size: 12px; color: #c4b5fd; text-align: center;
             margin-bottom: 4px; min-height: 16px; font-weight: 600;
         }
+        #boxiCurrentBanner {
+            display: none;
+            background: linear-gradient(135deg, #ccff00, #aaff00);
+            color: #1a1040; border-radius: 12px;
+            padding: 8px 12px; margin: 4px 0 6px;
+            text-align: center; font-weight: 900;
+            box-shadow: 0 4px 14px rgba(170,255,0,0.45);
+            border: 2px solid #84cc16;
+        }
+        #boxiCurrentBanner .ex-name {
+            font-size: 16px; line-height: 1.15;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+            word-break: break-word;
+        }
+        #boxiCurrentBanner .ex-meta {
+            font-size: 12px; font-weight: 800;
+            color: #064e00; margin-top: 2px;
+            letter-spacing: 0.04em;
+        }
+        #boxiCurrentBanner.show { display: block; animation: popIn 0.35s ease-out; }
+        .boxi-set-nav {
+            display: flex; justify-content: center; align-items: center;
+            gap: 8px; margin-top: 6px;
+        }
+        .boxi-set-nav button {
+            background: rgba(124,58,237,0.18); color: #fff;
+            border: 1px solid rgba(204,255,0,0.4); border-radius: 999px;
+            padding: 4px 10px; font-size: 11px; font-weight: 800;
+            cursor: pointer; transition: transform 0.1s, background 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .boxi-set-nav button:hover { background: rgba(124,58,237,0.32); }
+        .boxi-set-nav button:active { transform: scale(0.94); }
+        .boxi-set-nav button:disabled { opacity: 0.35; cursor: not-allowed; }
+        .boxi-set-nav .set-label { font-size: 11px; color: #ccff00; font-weight: 900; min-width: 80px; }
         #boxiCounter { text-align: center; margin: 2px 0 4px; }
         .boxi-rep-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
         #boxiRepNum {
@@ -1400,9 +1467,14 @@
             <p class="text-amber-800 text-base font-semibold">Tu plan de entrenamiento y nutrición</p>
             <p class="text-amber-700 text-sm mt-1" id="appUserGreeting">👤 Usuario</p>
             <div id="syncStatusBar" style="display:none;margin-top:6px;">
-                <div><span id="syncUserId" style="font-size:9px;color:#9ca3af;font-family:monospace;"></span></div>
+                <div>
+                    <span id="syncUserId" style="font-size:11px;color:#1f2937;font-family:monospace;font-weight:700;background:#fef3c7;padding:2px 6px;border-radius:4px;"></span>
+                    <span style="font-size:11px;color:#16a34a;font-weight:900;background:#dcfce7;padding:2px 8px;border-radius:4px;margin-left:6px;">v49</span>
+                </div>
                 <span id="syncStatusText" style="font-size:10px;color:#6b7280;">🔄 Conectando...</span>
-                <button onclick="forceSyncFromFirebase()" style="font-size:10px;background:#7c3aed;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:6px;cursor:pointer;font-weight:700;">↻ Sincronizar</button>
+                <span id="syncLastReceivedText" style="font-size:10px;color:#16a34a;margin-left:6px;font-weight:700;"></span>
+                <button onclick="forceSyncFromFirebase(true)" style="font-size:10px;background:#7c3aed;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:6px;cursor:pointer;font-weight:700;">↻ Sincronizar AHORA</button>
+                <button onclick="debugShowFirebaseData()" style="font-size:10px;background:#374151;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:4px;cursor:pointer;font-weight:700;">🔍 Ver datos servidor</button>
             </div>
         </div>
 
@@ -1990,6 +2062,64 @@
             } catch(e) { crossfitProgress = {}; }
         }
 
+        const CF_EXERCISES = [
+            'Clean', 'Clean and Jerk', 'Deadlift', 'Double Under', 'Front Squat',
+            'Handstand Push-Up (HSPU)', 'Kettlebell Swing', 'Knees-to-Elbows (K2E)',
+            'Lunges', 'Muscle-Up', 'Overhead Squat (OHS)', 'Pull-Up', 'Push-Up',
+            'Ring Dip', 'Snatch', 'Sumo Deadlift High Pull', 'Thruster',
+            'Toes-to-Bar (T2B)', 'Wall Ball Shot', 'Burpee', 'Box Jump',
+            'Row (Remo)', 'Run (Carrera)', 'Bike (Bicicleta)', 'Air Squat',
+            'Sit-Up', 'Hollow Hold', 'Plank', 'Farmer Walk', 'Power Clean',
+            'Power Snatch', 'Hang Clean', 'Hang Snatch', 'Push Press', 'Push Jerk',
+            'Split Jerk', 'Back Squat', 'Bench Press', 'Shoulder Press (Strict)',
+            'Turkish Get-Up', 'Bar Muscle-Up', 'Strict Pull-Up', 'Chest-to-Bar Pull-Up'
+        ];
+
+        function pickCustomCrossfitExercise(dk, idx) {
+            const existing = getCrossfitRow(dk, idx);
+            const custom = prompt('Escribe el nombre del ejercicio (no está en la lista):', existing.name && !CF_EXERCISES.includes(existing.name) ? existing.name : '');
+            if (custom === null) {
+                // Restaurar valor anterior en el select
+                const sel = document.getElementById(`cf_${dk}_${idx}_name`);
+                if (sel) sel.value = CF_EXERCISES.includes(existing.name) ? existing.name : (existing.name ? '__custom__' : '');
+                return;
+            }
+            const name = custom.trim();
+            const sel = document.getElementById(`cf_${dk}_${idx}_name`);
+            if (sel) {
+                // Si el nombre quedó vacío, deseleccionar
+                if (!name) { sel.value = ''; }
+                else {
+                    // Insertar opción dinámica (o seleccionar existente)
+                    let opt = Array.from(sel.options).find(o => o.value === name);
+                    if (!opt) {
+                        opt = document.createElement('option');
+                        opt.value = name; opt.textContent = name + ' (personalizado)';
+                        // Insertar antes del separador "__custom__"
+                        const customOpt = Array.from(sel.options).find(o => o.value === '__custom__');
+                        sel.insertBefore(opt, customOpt);
+                    }
+                    sel.value = name;
+                }
+            }
+            // Guardar el valor manualmente
+            if (!crossfitProgress[dk]) crossfitProgress[dk] = {};
+            crossfitProgress[dk][idx] = { ...existing, name };
+            saveCrossfitProgress();
+            const cfSumEl = document.getElementById('cf_summary_' + dk);
+            if (cfSumEl) cfSumEl.innerHTML = buildSectionSummaryHtml(calcCrossfitPct(dk), '🏃 CrossFit', 'orange');
+        }
+
+        function onCrossfitNameChange(dk, idx) {
+            const sel = document.getElementById(`cf_${dk}_${idx}_name`);
+            if (!sel) return;
+            if (sel.value === '__custom__') {
+                pickCustomCrossfitExercise(dk, idx);
+                return;
+            }
+            updateCrossfitRow(dk, idx);
+        }
+
         function getCrossfitRow(dateKey, idx) {
             const d = crossfitProgress[dateKey]?.[idx] || {};
             return {
@@ -2092,7 +2222,17 @@
                 rows += `
                     <tr class="border-b border-orange-100">
                         <td class="py-1 pr-1 text-[10px] text-gray-400 font-bold w-4">${i + 1}</td>
-                        <td class="py-1 pr-1"><input type="text" list="cfExerciseList" value="${r.name}" placeholder="Ejercicio" autocomplete="off" class="w-full text-xs border border-orange-200 rounded px-1.5 py-0.5 focus:border-orange-400 focus:outline-none" id="${uid}_name" onchange="updateCrossfitRow('${dk}',${i})" oninput="updateCrossfitRow('${dk}',${i})"/></td>
+                        <td class="py-1 pr-1">${(() => {
+                            const isCustom = r.name && !CF_EXERCISES.includes(r.name);
+                            const opts = CF_EXERCISES.map(n => `<option value="${n}" ${r.name === n ? 'selected' : ''}>${n}</option>`).join('');
+                            const customOpt = isCustom ? `<option value="${r.name}" selected>${r.name} (personalizado)</option>` : '';
+                            return `<select class="w-full text-xs border border-orange-200 rounded px-1.5 py-1 bg-white focus:border-orange-400 focus:outline-none" id="${uid}_name" onchange="onCrossfitNameChange('${dk}',${i})">
+                                <option value="">— Elige ejercicio —</option>
+                                ${opts}
+                                ${customOpt}
+                                <option value="__custom__">✏️ Otro / Escribir nombre…</option>
+                            </select>`;
+                        })()}</td>
                         <td class="py-1 px-1">
                             <div class="flex items-center gap-0.5">
                                 <input type="number" min="0" max="200" value="${r.pct}" placeholder="%" class="w-12 text-center text-xs border border-orange-200 rounded py-0.5 font-bold focus:border-orange-400 focus:outline-none" id="${uid}_pct" onchange="updateCrossfitRow('${dk}',${i})" oninput="updateCrossfitRow('${dk}',${i})"/>
@@ -3636,54 +3776,69 @@
                 : 'Armando tu planificación con tu perfil…';
             showAILoadingOverlay(loadingMsg, loadingSubtitle);
 
-            if (_claudeApiKey) {
-                try {
-                    const aiPlan = await generateWeekWithClaude(dayTimeData);
-                    if (aiPlan) {
-                        applyAIPlanToWeeklyPlan(aiPlan, dayTimeData, nextMon);
-                        usedAI = true;
-                    }
-                } catch(e) { console.warn('AI plan fallback to local:', e); }
-            }
+            // Failsafe: si por alguna razón nada cierra el overlay en 120s, lo cierro forzado
+            const overlayFailsafe = setTimeout(() => {
+                console.warn('Overlay failsafe disparado: cerrando overlay tras 120s');
+                hideAILoadingOverlay();
+            }, 120000);
 
-            if (!usedAI) {
-                generateNewWeek(dayTimeData);
-            } else {
-                // Finish steps that generateNewWeek does
-                const summary = collectWeeklySummary();
-                const nutritionCtx = getNutritionContext();
-                const objectives = athleteObjectives;
-                const insightHtml = buildAIInsightMessage(summary, nutritionCtx, objectives);
-                const insightSection = document.getElementById('aiInsightSection');
-                const insightContent = document.getElementById('aiInsightContent');
-                if (insightSection && insightContent) { insightContent.innerHTML = insightHtml; insightSection.classList.remove('hidden'); }
-                resetCurrentWeekProgress();
-                currentWeekNumber++;
-                saveWeekNumber();
-                saveWeeklyPlan();
-                updatePlanInfo();
-                renderTodayWorkout();
-                renderWeeklyWorkouts();
-                if (insightSection) insightSection.scrollIntoView({ behavior: 'smooth' });
-            }
+            try {
+                if (_claudeApiKey) {
+                    try {
+                        const aiPlan = await generateWeekWithClaude(dayTimeData);
+                        if (aiPlan) {
+                            applyAIPlanToWeeklyPlan(aiPlan, dayTimeData, nextMon);
+                            usedAI = true;
+                        }
+                    } catch(e) { console.warn('AI plan fallback to local:', e); }
+                }
 
-            saveCalendarSchedule();
-            try { localStorage.setItem('weeklyPlan', JSON.stringify(weeklyPlan)); } catch(e) {}
-            try { localStorage.setItem('workoutProgress', JSON.stringify(workoutProgress)); } catch(e) {}
-            try { localStorage.setItem('crossfitProgress', JSON.stringify(crossfitProgress)); } catch(e) {}
-            renderCalendar();
-            // Build AI details for the modal
-            const aiDetails = { dayTimeData };
-            if (usedAI) {
-                aiDetails.hasObjectives = !!(athleteObjectives && athleteObjectives.trim());
-                aiDetails.hasVideos = !!(athleteVideoLinks && athleteVideoLinks.length > 0);
-                aiDetails.hasEquipment = !!(athleteEquipment && athleteEquipment.length > 0);
-                aiDetails.hasNutrition = !!(typeof nutritionRecords !== 'undefined' && nutritionRecords && Object.keys(nutritionRecords).length > 0);
-                aiDetails.hasProgress = !!(workoutProgress && Object.keys(workoutProgress).length > 0);
+                if (!usedAI) {
+                    generateNewWeek(dayTimeData);
+                } else {
+                    // Finish steps that generateNewWeek does
+                    const summary = collectWeeklySummary();
+                    const nutritionCtx = getNutritionContext();
+                    const objectives = athleteObjectives;
+                    const insightHtml = buildAIInsightMessage(summary, nutritionCtx, objectives);
+                    const insightSection = document.getElementById('aiInsightSection');
+                    const insightContent = document.getElementById('aiInsightContent');
+                    if (insightSection && insightContent) { insightContent.innerHTML = insightHtml; insightSection.classList.remove('hidden'); }
+                    resetCurrentWeekProgress();
+                    currentWeekNumber++;
+                    saveWeekNumber();
+                    saveWeeklyPlan();
+                    updatePlanInfo();
+                    renderTodayWorkout();
+                    renderWeeklyWorkouts();
+                    if (insightSection) insightSection.scrollIntoView({ behavior: 'smooth' });
+                }
+
+                saveCalendarSchedule();
+                try { localStorage.setItem('weeklyPlan', JSON.stringify(weeklyPlan)); } catch(e) {}
+                try { localStorage.setItem('workoutProgress', JSON.stringify(workoutProgress)); } catch(e) {}
+                try { localStorage.setItem('crossfitProgress', JSON.stringify(crossfitProgress)); } catch(e) {}
+                renderCalendar();
+                // Build AI details for the modal
+                const aiDetails = { dayTimeData };
+                if (usedAI) {
+                    aiDetails.hasObjectives = !!(athleteObjectives && athleteObjectives.text && athleteObjectives.text.trim());
+                    aiDetails.hasVideos = !!(athleteVideoLinks && athleteVideoLinks.length > 0);
+                    aiDetails.hasEquipment = !!(athleteEquipment && athleteEquipment.length > 0);
+                    aiDetails.hasNutrition = !!(typeof nutritionRecords !== 'undefined' && nutritionRecords && Object.keys(nutritionRecords).length > 0);
+                    aiDetails.hasProgress = !!(workoutProgress && Object.keys(workoutProgress).length > 0);
+                }
+                hideAILoadingOverlay();
+                clearTimeout(overlayFailsafe);
+                showWeekGeneratedModal(usedAI, aiDetails);
+                showSyncToast(usedAI ? '🤖 Semana generada con IA y guardada en servidor' : '✅ Planificación generada y guardada en servidor');
+            } catch(err) {
+                clearTimeout(overlayFailsafe);
+                console.error('generateWeekFromCalendar fatal error:', err);
+                hideAILoadingOverlay();
+                alert('⚠️ Ocurrió un error generando tu semana: ' + (err?.message || err) + '\n\nSe usará el generador local como respaldo.');
+                try { generateNewWeek(dayTimeData); saveWeeklyPlan(); renderTodayWorkout(); renderWeeklyWorkouts(); renderCalendar(); } catch(e2) { console.error(e2); }
             }
-            hideAILoadingOverlay();
-            showWeekGeneratedModal(usedAI, aiDetails);
-            showSyncToast(usedAI ? '🤖 Semana generada con IA y guardada en servidor' : '✅ Planificación generada y guardada en servidor');
         }
 
         function setTrainingMode(mode) {
@@ -5401,7 +5556,17 @@
             const prog = getExerciseProgress(dk, exIdx);
             const pct = calcExercisePct(prog);
             const donutEl = document.getElementById(`${uid}_donut`);
-            if (donutEl) donutEl.innerHTML = buildDonutSvg(pct, 48, 5) + `<p class="text-[10px] font-bold mt-1">${pct}%</p>`;
+            if (donutEl) {
+                // Always preserve the BOXI help + swap buttons — accesibles incluso si está hecho.
+                donutEl.innerHTML = buildDonutSvg(pct, 48, 5)
+                    + `<p class="text-[10px] font-bold mt-1">${pct}%</p>`
+                    + `<button type="button" class="boxi-help-ex-btn" onclick="boxiShow('${dk}',${exIdx})" aria-label="BOXI ayúdame aquí">
+                           <span class="glove">🥊</span><span class="lbl">BOXI AYÚDAME AQUÍ</span>
+                       </button>`
+                    + `<button type="button" class="swap-ex-btn" onclick="swapExerciseWithAI('${dk}',${exIdx})" aria-label="Cambiar este ejercicio con IA">
+                           <span class="ico">🔄</span><span class="lbl">CAMBIAR ESTE EJERCICIO</span>
+                       </button>`;
+            }
             updateDaySummary(dk);
         }
 
@@ -5430,9 +5595,17 @@
             const completionBtnText = isDone ? '✔ HECHO' : '⏳ PENDIENTE';
             const completionBtnIcon = isDone ? 'fa-check-circle' : 'fa-circle';
 
+            const searchQuery = encodeURIComponent((exercise.name || '') + ' técnica ejercicio');
+            const searchUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
             const mediaBlock = exercise.hasVideo
-                ? `<a href="${getYoutubeWatchUrl(exercise.videoId)}" target="_blank" class="youtube-link px-3 py-1 rounded-lg text-sm font-semibold flex items-center gap-1 whitespace-nowrap"><i class="fab fa-youtube"></i> Ver</a>`
-                : `<div class="bg-amber-100 border border-amber-300 px-2 py-1 rounded-lg text-[10px] text-amber-800 font-semibold"><i class="fas fa-triangle-exclamation mr-1"></i>Sin video</div>`;
+                ? `<div class="flex items-center gap-1 flex-wrap">
+                       <a href="${getYoutubeWatchUrl(exercise.videoId)}" target="_blank" class="youtube-link px-3 py-1 rounded-lg text-sm font-semibold flex items-center gap-1 whitespace-nowrap"><i class="fab fa-youtube"></i> Ver</a>
+                       <a href="${searchUrl}" target="_blank" class="bg-gray-100 border border-gray-300 hover:bg-gray-200 px-2 py-1 rounded-lg text-[10px] text-gray-700 font-semibold flex items-center gap-1 whitespace-nowrap" title="Si el video no coincide con el ejercicio, busca otros en YouTube"><i class="fas fa-search mr-0.5"></i>Otros videos</a>
+                   </div>`
+                : `<div class="flex items-center gap-1 flex-wrap">
+                       <div class="bg-amber-100 border border-amber-300 px-2 py-1 rounded-lg text-[10px] text-amber-800 font-semibold"><i class="fas fa-triangle-exclamation mr-1"></i>Sin video</div>
+                       <a href="${searchUrl}" target="_blank" class="bg-red-100 border border-red-300 hover:bg-red-200 px-2 py-1 rounded-lg text-[10px] text-red-700 font-semibold flex items-center gap-1 whitespace-nowrap"><i class="fab fa-youtube mr-0.5"></i>Buscar en YouTube</a>
+                   </div>`;
 
             const fallbackGuide = exercise.hasVideo
                 ? ''
@@ -5512,6 +5685,9 @@
                             <button type="button" class="boxi-help-ex-btn" onclick="boxiShow('${dk}',${idx})" aria-label="BOXI ayúdame aquí">
                                 <span class="glove">🥊</span><span class="lbl">BOXI AYÚDAME AQUÍ</span>
                             </button>
+                            <button type="button" class="swap-ex-btn" onclick="swapExerciseWithAI('${dk}',${idx})" aria-label="Cambiar este ejercicio con IA">
+                                <span class="ico">🔄</span><span class="lbl">CAMBIAR ESTE EJERCICIO</span>
+                            </button>
                         </div>
                     </div>
                     ${fallbackGuide}
@@ -5580,6 +5756,37 @@
                 doneRow.outerHTML = `<button type="button" onclick="toggleExCompleted('${dk}',${idx})" class="bg-emerald-500 hover:bg-emerald-600 text-white w-full mt-2 py-2 rounded-lg font-bold text-sm transition-all" id="${uid}_completionBtn"><i class="fas fa-circle mr-1"></i>⏳ PENDIENTE — MARCAR COMO HECHO</button>`;
             }
             refreshExDonut(dk, idx);
+        }
+
+        // Marca TODOS los ejercicios de pesas de un día como hechos (botón "CLASE HECHA SUPER")
+        function markAllDayCompleted(dk) {
+            const dayDate = new Date(dk + 'T00:00:00');
+            const dayName = DAY_NAMES_MAP[dayDate.getDay()];
+            const dayPlan = (typeof weeklyPlan !== 'undefined') ? weeklyPlan[dayName] : null;
+            let exercises = [];
+            if (Array.isArray(dayPlan)) {
+                exercises = dayPlan.filter(e => e && e.name);
+            } else if (dayPlan && typeof dayPlan === 'object') {
+                exercises = Object.values(dayPlan).filter(v => typeof v === 'object' && v && v.name);
+            }
+            if (exercises.length === 0) {
+                alert('No hay ejercicios para marcar en este día.');
+                return;
+            }
+            if (!confirm(`🔥 ¿Marcar como HECHA toda la clase?\n\nSe marcarán los ${exercises.length} ejercicios de este día como completados.`)) return;
+            if (!workoutProgress[dk]) workoutProgress[dk] = {};
+            for (let i = 0; i < exercises.length; i++) {
+                const prog = getExerciseProgress(dk, i);
+                prog.completed = true;
+                if (!prog.doneSets) prog.doneSets = prog.goalSets || 4;
+                if (!prog.doneReps) prog.doneReps = prog.goalReps || 10;
+                workoutProgress[dk][i] = prog;
+            }
+            saveWorkoutProgress();
+            setTimeout(() => saveWorkoutProgress(), 300);
+            // Re-render visible views
+            try { renderTodayWorkout(); } catch (e) {}
+            try { renderWeeklyWorkouts(); } catch (e) {}
         }
 
         function updateDaySummary(dk) {
@@ -5727,6 +5934,7 @@
                     if (weightsBlocksRendered === wSessions.length && enrichedExercises.length > 0 && !weightsSummaryEmitted) {
                         const weightsPct = calcDayPct(dk, enrichedExercises.length);
                         html += `<div id="weights_summary_${dk}" data-count="${enrichedExercises.length}" class="mt-4">${buildSectionSummaryHtml(weightsPct, '💪 Pesas', 'purple')}</div>`;
+                        html += `<button type="button" onclick="markAllDayCompleted('${dk}')" class="w-full mt-3 py-3 px-4 rounded-xl font-black text-base bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-lg transition-all" style="letter-spacing:0.04em;">🔥 CLASE HECHA SUPER!! <span style="font-size:11px;font-weight:700;opacity:0.9;display:block;margin-top:2px;">Marcar todos los ejercicios del día como hechos</span></button>`;
                         weightsSummaryEmitted = true;
                     }
                 } else if (s.type === 'crossfit') {
@@ -5971,6 +6179,7 @@
                         if (weightsBlocksRendered === wSessions.length && enrichedPlan.length > 0 && !weightsSummaryEmitted) {
                             const weightsPct = calcDayPct(dk, exerciseCount);
                             html += `<div id="weights_summary_${dk}" data-count="${exerciseCount}" class="mt-3">${buildSectionSummaryHtml(weightsPct, '💪 Pesas', 'purple')}</div>`;
+                            html += `<button type="button" onclick="markAllDayCompleted('${dk}')" class="w-full mt-3 py-3 px-3 rounded-xl font-black text-sm bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-lg transition-all" style="letter-spacing:0.03em;">🔥 CLASE HECHA SUPER!! <span style="font-size:10px;font-weight:700;opacity:0.9;display:block;margin-top:2px;">Marcar todo el día como hecho</span></button>`;
                             weightsSummaryEmitted = true;
                         }
                     } else if (s.type === 'crossfit') {
@@ -6755,22 +6964,38 @@
         }
         let _pauseTimer = null;
         let _localWriteTimestamps = {}; // key → Date.now() of last LOCAL write — protects against stale sync
-        const LOCAL_WRITE_PROTECT_MS = 8000; // ignore incoming sync for 8s after local write per-key (echo protection)
+        const LOCAL_WRITE_PROTECT_MS = 3000; // 3s es suficiente para echo prevention; ventanas más largas bloquean cambios cross-device legítimos
+        let _lastSyncReceived = null;       // timestamp del último value event recibido del listener
+        let _lastSyncAppliedAt = null;      // timestamp del último cambio que SÍ se aplicó (rendered)
+        let _lastFirebaseWriteOK = null;    // timestamp de la última escritura exitosa a Firebase
+        let _lastFirebaseWriteError = null; // { key, time, msg } de la última escritura que falló
+        let _storagePatched = false;        // flag para confirmar que enableUserStorage() corrió
+        let _patchedSetItemCount = {};      // contador por key de invocaciones a patchedSetItem
+        let _firebaseSetAttempts = {};      // contador por key de intentos de firebaseDB.ref().set()
+        let _lastPatchedSetItemCall = null; // { key, time, valPreview } último setItem llamado
         function patchedSetItem(key, val) {
+            // Track invocación para diagnóstico
+            _patchedSetItemCount[key] = (_patchedSetItemCount[key] || 0) + 1;
+            _lastPatchedSetItemCall = { key, time: Date.now(), valPreview: String(val).substring(0, 60) };
             if (currentUserId && perUserKeys.includes(key)) {
                 originalSetItem(getUserStoragePrefix() + key, val);
                 // Skip Firebase write during sync-triggered reload to avoid echo loop
-                if (_syncReloading) return;
+                if (_syncReloading) { console.log('⏸️ FB write skipped (syncReloading):', key); return; }
                 // Track local modification timestamp (protects against stale sync from other devices)
                 _localWriteTimestamps[key] = Date.now();
                 // Sync to Firebase — pause listener briefly to avoid echo
                 if (firebaseDB && currentUserId) {
+                    _firebaseSetAttempts[key] = (_firebaseSetAttempts[key] || 0) + 1;
                     _userDataSyncPaused = true;
                     if (_pauseTimer) clearTimeout(_pauseTimer);
+                    console.log('📤 FB write START:', key, '→ userData/' + currentUserId + '/' + key);
                     firebaseDB.ref('userData/' + currentUserId + '/' + key).set(val)
-                        .then(() => console.log('✅ FB write OK:', key))
-                        .catch(e => console.error('❌ FB write FAIL:', key, e));
-                    _pauseTimer = setTimeout(() => { _userDataSyncPaused = false; _pauseTimer = null; }, 8000);
+                        .then(() => { console.log('✅ FB write OK:', key); _lastFirebaseWriteOK = Date.now(); })
+                        .catch(e => { console.error('❌ FB write FAIL:', key, e); _lastFirebaseWriteError = { key, time: Date.now(), msg: e.message || String(e) }; showSyncToast('❌ Error sync ' + key + ': ' + (e.message || e)); });
+                    _pauseTimer = setTimeout(() => { _userDataSyncPaused = false; _pauseTimer = null; }, 3000);
+                } else if (currentUserId && !firebaseDB) {
+                    console.warn('⚠️ FB write SKIPPED — firebaseDB no inicializado:', key);
+                    showSyncToast('⚠️ Sin conexión a servidor — los cambios solo están en este dispositivo');
                 }
                 return;
             }
@@ -6784,9 +7009,46 @@
             return (Date.now() - ts) < LOCAL_WRITE_PROTECT_MS;
         }
 
+        // Merge profundo para workoutProgress / crossfitProgress.
+        // Estructura: { dateKey: { exIdx: { fields... } } }
+        // Estrategia: si hay conflicto en (dateKey, exIdx, field), gana el que tenga "completed:true" (eco de "ya lo hice").
+        // Si ambos tienen completed:true → gana el remoto (asumimos que Firebase es más fresco que la copia en memoria local).
+        // Para campos no-completed → gana el que tenga el valor "más reciente" basado en presencia (remoto si existe, sino local).
+        function mergeProgressDeep(localObj, remoteObj) {
+            if (!remoteObj || typeof remoteObj !== 'object') return localObj || {};
+            if (!localObj || typeof localObj !== 'object') return JSON.parse(JSON.stringify(remoteObj));
+            const out = {};
+            const allDates = new Set([...Object.keys(localObj), ...Object.keys(remoteObj)]);
+            for (const dk of allDates) {
+                const lDay = localObj[dk] || {};
+                const rDay = remoteObj[dk] || {};
+                if (typeof lDay !== 'object' || typeof rDay !== 'object') { out[dk] = rDay || lDay; continue; }
+                const dayOut = {};
+                const allIdx = new Set([...Object.keys(lDay), ...Object.keys(rDay)]);
+                for (const idx of allIdx) {
+                    const lEx = lDay[idx];
+                    const rEx = rDay[idx];
+                    if (!lEx) { dayOut[idx] = rEx; continue; }
+                    if (!rEx) { dayOut[idx] = lEx; continue; }
+                    // Ambos existen: hacer merge campo por campo, completed:true gana
+                    const merged = { ...lEx, ...rEx };
+                    // Si local tiene completed:true y remoto false → preservar el true local (cambio del usuario aún no llegó a remoto)
+                    if (lEx.completed === true && rEx.completed === false) merged.completed = true;
+                    // doneSets/doneReps: tomar el máximo (suponemos progresión, no se "deshace")
+                    if (typeof lEx.doneSets === 'number' && typeof rEx.doneSets === 'number') merged.doneSets = Math.max(lEx.doneSets, rEx.doneSets);
+                    if (typeof lEx.doneReps === 'number' && typeof rEx.doneReps === 'number') merged.doneReps = Math.max(lEx.doneReps, rEx.doneReps);
+                    dayOut[idx] = merged;
+                }
+                out[dk] = dayOut;
+            }
+            return out;
+        }
+
         function enableUserStorage() {
             localStorage.getItem = patchedGetItem;
             localStorage.setItem = patchedSetItem;
+            _storagePatched = true;
+            console.log('✅ enableUserStorage() activado para user:', currentUserId);
         }
 
         // Load all per-user data from Firebase into localStorage + attach real-time listener
@@ -6867,38 +7129,59 @@
                 _userDataListener.on('value', snap => {
                     // Skip the initial fire (we already loaded data above)
                     if (_firstFire) { _firstFire = false; return; }
+                    _lastSyncReceived = Date.now();
                     if (_userDataSyncPaused) { console.log('🛡️ on(value): paused, skipping'); return; }
                     const fbData = snap.val();
                     if (!fbData) return;
                     const prefix = getUserStoragePrefix();
+                    const parseOrUse = (v) => typeof v === 'string' ? JSON.parse(v) : v;
                     let changed = false;
-                    perUserKeys.forEach(key => {
-                        if (fbData[key] !== undefined && fbData[key] !== null) {
-                            // Skip keys that were locally modified recently — local changes win
-                            if (isKeyLocallyProtected(key)) {
-                                console.log('🛡️ Skipping sync for locally protected key:', key);
-                                return;
-                            }
-                            const fbStr = fbValToString(fbData[key]);
-                            const current = originalGetItem(prefix + key);
-                            if (current !== fbStr) {
-                                originalSetItem(prefix + key, fbStr);
+
+                    // ====== Special handling for workoutProgress / crossfitProgress: MERGE deep ======
+                    ['workoutProgress', 'crossfitProgress'].forEach(key => {
+                        if (fbData[key] === undefined || fbData[key] === null) return;
+                        try {
+                            const remoteObj = parseOrUse(fbData[key]);
+                            if (!remoteObj || typeof remoteObj !== 'object') return;
+                            const localObj = (key === 'workoutProgress') ? workoutProgress : crossfitProgress;
+                            const merged = mergeProgressDeep(localObj, remoteObj);
+                            const mergedStr = JSON.stringify(merged);
+                            const localStr = JSON.stringify(localObj);
+                            if (mergedStr !== localStr) {
+                                if (key === 'workoutProgress') workoutProgress = merged;
+                                else crossfitProgress = merged;
+                                originalSetItem(prefix + key, mergedStr);
                                 changed = true;
-                                console.log('🔄 Sync key:', key);
+                                console.log('🔄 Sync (merge profundo):', key);
                             }
+                        } catch(e) { console.warn('Merge error for', key, e); }
+                    });
+
+                    // ====== Other keys: standard overwrite if not locally protected ======
+                    perUserKeys.forEach(key => {
+                        if (key === 'workoutProgress' || key === 'crossfitProgress') return;
+                        if (fbData[key] === undefined || fbData[key] === null) return;
+                        if (isKeyLocallyProtected(key)) {
+                            console.log('🛡️ Skipping sync for locally protected key:', key);
+                            return;
+                        }
+                        const fbStr = fbValToString(fbData[key]);
+                        const current = originalGetItem(prefix + key);
+                        if (current !== fbStr) {
+                            originalSetItem(prefix + key, fbStr);
+                            changed = true;
+                            console.log('🔄 Sync key:', key);
                         }
                     });
+
                     if (changed) {
+                        _lastSyncAppliedAt = Date.now();
                         console.log('🔄 Datos sincronizados desde otro dispositivo');
-                        // Direct variable assignment — ONLY for keys NOT locally protected
                         try {
-                            const parseOrUse = (v) => typeof v === 'string' ? JSON.parse(v) : v;
                             if (fbData.calendarSchedule && !isKeyLocallyProtected('calendarSchedule')) { const p = parseOrUse(fbData.calendarSchedule); if (p && typeof p === 'object') calendarSchedule = p; }
                             if (fbData.generatedWeeks && !isKeyLocallyProtected('generatedWeeks')) { const p = parseOrUse(fbData.generatedWeeks); if (p && typeof p === 'object') generatedWeeks = p; }
                             if (fbData.weeklySchedule && !isKeyLocallyProtected('weeklySchedule')) { const p = parseOrUse(fbData.weeklySchedule); if (p && typeof p === 'object') weeklySchedule = p; }
                             if (fbData.weeklyPlan && !isKeyLocallyProtected('weeklyPlan')) { const p = parseOrUse(fbData.weeklyPlan); if (p && typeof p === 'object') weeklyPlan = p; }
-                            if (fbData.workoutProgress && !isKeyLocallyProtected('workoutProgress')) { const p = parseOrUse(fbData.workoutProgress); if (p && typeof p === 'object') workoutProgress = p; }
-                            if (fbData.crossfitProgress && !isKeyLocallyProtected('crossfitProgress')) { const p = parseOrUse(fbData.crossfitProgress); if (p && typeof p === 'object') crossfitProgress = p; }
                             if (fbData.trainingMode && !isKeyLocallyProtected('trainingMode') && typeof fbData.trainingMode === 'string') trainingMode = fbData.trainingMode;
                             if (fbData.nutritionRecords && !isKeyLocallyProtected('nutritionRecords')) { const p = parseOrUse(fbData.nutritionRecords); if (p && typeof p === 'object') nutritionRecords = p; }
                             if (fbData.athleteObjectives && !isKeyLocallyProtected('athleteObjectives')) { const p = parseOrUse(fbData.athleteObjectives); if (p && typeof p === 'object') athleteObjectives = p; }
@@ -6926,6 +7209,26 @@
             if (el) el.textContent = msg;
         }
 
+        // Tick "Sync recibida hace Xs" every 2 seconds so the user can see if listener is alive
+        function _formatAgo(ms) {
+            if (ms == null) return '— sin datos';
+            const sec = Math.floor((Date.now() - ms) / 1000);
+            if (sec < 60) return `hace ${sec}s`;
+            const min = Math.floor(sec / 60);
+            if (min < 60) return `hace ${min}min`;
+            const hrs = Math.floor(min / 60);
+            return `hace ${hrs}h${min % 60}m`;
+        }
+        setInterval(() => {
+            const el = document.getElementById('syncLastReceivedText');
+            if (!el) return;
+            if (!_lastSyncReceived) { el.textContent = '📡 Sin sync aún'; el.style.color = '#9ca3af'; return; }
+            const sec = Math.floor((Date.now() - _lastSyncReceived) / 1000);
+            const appliedTxt = _lastSyncAppliedAt ? ` · cambio aplicado ${_formatAgo(_lastSyncAppliedAt)}` : '';
+            el.textContent = `📡 Sync ${_formatAgo(_lastSyncReceived)}${appliedTxt}`;
+            el.style.color = sec < 60 ? '#16a34a' : sec < 300 ? '#ca8a04' : '#dc2626';
+        }, 2000);
+
         // Force re-sync from Firebase — clears local data and reloads from server
         // Respects locally-protected keys to avoid overwriting recent user changes
         let _lastForceSyncTime = 0;
@@ -6935,17 +7238,22 @@
             }
             return false;
         }
-        async function forceSyncFromFirebase() {
+        async function forceSyncFromFirebase(forceIgnoreProtection = false) {
             if (!firebaseDB || !currentUserId) {
                 updateSyncStatus('❌ No conectado');
                 showSyncToast('❌ No hay conexión a Firebase');
                 return;
             }
-            // Guard: skip if any local write happened recently (prevents race condition on mobile)
-            if (_anyKeyLocallyProtected()) {
+            // Guard: skip if any local write happened recently — UNLESS user explicitly forced it
+            if (!forceIgnoreProtection && _anyKeyLocallyProtected()) {
                 console.log('🛡️ forceSyncFromFirebase: skipped — local write in progress');
                 updateSyncStatus('🛡️ Protegido — cambio local reciente');
                 return;
+            }
+            // Si el usuario forzó: limpiar timestamps de protección para que TODAS las keys se actualicen
+            if (forceIgnoreProtection) {
+                _localWriteTimestamps = {};
+                console.log('⚡ forceSyncFromFirebase: usuario forzó — ignorando protección local');
             }
             // Guard: minimum 3 seconds between force syncs
             if (Date.now() - _lastForceSyncTime < 3000) {
@@ -7038,6 +7346,65 @@
             }
         }
 
+        // Debug: muestra el workoutProgress crudo desde Firebase comparado con el local.
+        // Útil para confirmar que ambos dispositivos están escribiendo al MISMO userId.
+        async function debugShowFirebaseData() {
+            if (!firebaseDB || !currentUserId) { alert('No hay conexión a Firebase'); return; }
+            try {
+                const snap = await firebaseDB.ref('userData/' + currentUserId + '/workoutProgress').once('value');
+                const raw = snap.val();
+                const remote = raw === null || raw === undefined ? null : (typeof raw === 'string' ? JSON.parse(raw) : raw);
+                const todayKey = getWorkoutDateKey();
+
+                function summarize(obj) {
+                    if (!obj) return '(vacío)';
+                    const dates = Object.keys(obj).sort().slice(-5);
+                    return dates.map(dk => {
+                        const day = obj[dk] || {};
+                        const ids = Object.keys(day);
+                        const done = ids.filter(i => day[i] && day[i].completed === true).length;
+                        const ptOk = dk === todayKey ? ' ◀ HOY' : '';
+                        return `  ${dk}: ${ids.length} ejercicios, ${done} ✔ HECHOS${ptOk}`;
+                    }).join('\n') || '(sin fechas)';
+                }
+
+                const wpCount = _patchedSetItemCount['workoutProgress'] || 0;
+                const wpFbAttempts = _firebaseSetAttempts['workoutProgress'] || 0;
+                const lastCall = _lastPatchedSetItemCall;
+
+                const msg = `═══ DIAGNÓSTICO DE SYNC ═══
+👤 Usuario: ${currentUserId}
+📅 Fecha local (HOY): ${todayKey}
+🕐 Hora local: ${new Date().toLocaleString('es-ES')}
+🔥 firebaseDB: ${firebaseDB ? 'CONECTADO' : '❌ NO CONECTADO'}
+🔧 localStorage parcheado: ${_storagePatched ? 'SÍ ✅' : '❌ NO — los cambios NO se sincronizan'}
+
+🌐 Firebase (workoutProgress) — últimos 5 días:
+${summarize(remote)}
+
+💻 Local (workoutProgress) — últimos 5 días:
+${summarize(workoutProgress)}
+
+📊 INVOCACIONES (desde que abriste la app):
+• saveWorkoutProgress() → patchedSetItem('workoutProgress'): ${wpCount} veces
+• firebaseDB.ref('workoutProgress').set(): ${wpFbAttempts} intentos
+${lastCall ? '• Último setItem: ' + lastCall.key + ' hace ' + Math.floor((Date.now() - lastCall.time)/1000) + 's' : '• Último setItem: ninguno aún'}
+
+📡 Última sync RECIBIDA: ${_lastSyncReceived ? new Date(_lastSyncReceived).toLocaleString('es-ES') : 'NUNCA'}
+✅ Última sync APLICADA: ${_lastSyncAppliedAt ? new Date(_lastSyncAppliedAt).toLocaleString('es-ES') : 'NUNCA'}
+📤 Última ESCRITURA OK a Firebase: ${_lastFirebaseWriteOK ? new Date(_lastFirebaseWriteOK).toLocaleString('es-ES') : 'NUNCA'}
+❌ Último ERROR de escritura: ${_lastFirebaseWriteError ? new Date(_lastFirebaseWriteError.time).toLocaleString('es-ES') + ' [' + _lastFirebaseWriteError.key + '] ' + _lastFirebaseWriteError.msg : 'ninguno'}
+`;
+                console.log(msg);
+                console.log('Firebase raw:', remote);
+                console.log('Local:', workoutProgress);
+                alert(msg);
+            } catch(e) {
+                console.error('debugShowFirebaseData error:', e);
+                alert('Error leyendo Firebase: ' + e.message);
+            }
+        }
+
         // Re-connect Firebase when app comes back to foreground
         // NO forced sync — the real-time on('value') listener handles all sync automatically.
         // forceSyncFromFirebase was causing race conditions on mobile by overwriting local changes.
@@ -7053,10 +7420,66 @@
             }
         });
 
-        // Polling REMOVED — real-time listener handles cross-device sync.
-        // Polling caused forceSyncFromFirebase() every 30s which overwrote local changes.
-        function startSyncPolling() { /* disabled */ }
-        function stopSyncPolling() { /* disabled */ }
+        // Polling SOLO de workoutProgress + crossfitProgress cada 10s con merge profundo.
+        // No toca otras keys, así que no pisa cambios locales en el plan / objetivos / etc.
+        let _progressPollInterval = null;
+        async function pollProgressKeys() {
+            if (!firebaseDB || !currentUserId) return;
+            try {
+                const [wpSnap, cfSnap] = await Promise.all([
+                    firebaseDB.ref('userData/' + currentUserId + '/workoutProgress').once('value'),
+                    firebaseDB.ref('userData/' + currentUserId + '/crossfitProgress').once('value')
+                ]);
+                _lastSyncReceived = Date.now();
+                const prefix = getUserStoragePrefix();
+                let renderNeeded = false;
+
+                const wpRaw = wpSnap.val();
+                if (wpRaw !== null && wpRaw !== undefined) {
+                    const remote = typeof wpRaw === 'string' ? JSON.parse(wpRaw) : wpRaw;
+                    if (remote && typeof remote === 'object') {
+                        const merged = mergeProgressDeep(workoutProgress, remote);
+                        const mergedStr = JSON.stringify(merged);
+                        if (mergedStr !== JSON.stringify(workoutProgress)) {
+                            workoutProgress = merged;
+                            originalSetItem(prefix + 'workoutProgress', mergedStr);
+                            renderNeeded = true;
+                            console.log('🔄 Poll: workoutProgress mergeado desde Firebase');
+                        }
+                    }
+                }
+
+                const cfRaw = cfSnap.val();
+                if (cfRaw !== null && cfRaw !== undefined) {
+                    const remote = typeof cfRaw === 'string' ? JSON.parse(cfRaw) : cfRaw;
+                    if (remote && typeof remote === 'object') {
+                        const merged = mergeProgressDeep(crossfitProgress, remote);
+                        const mergedStr = JSON.stringify(merged);
+                        if (mergedStr !== JSON.stringify(crossfitProgress)) {
+                            crossfitProgress = merged;
+                            originalSetItem(prefix + 'crossfitProgress', mergedStr);
+                            renderNeeded = true;
+                            console.log('🔄 Poll: crossfitProgress mergeado desde Firebase');
+                        }
+                    }
+                }
+
+                if (renderNeeded) {
+                    _lastSyncAppliedAt = Date.now();
+                    _syncReloading = true;
+                    try { renderTodayWorkout(); renderWeeklyWorkouts(); renderCalendar(); } finally { _syncReloading = false; }
+                    showSyncToast('🔄 Progreso actualizado desde otro dispositivo');
+                }
+            } catch(e) { console.warn('pollProgressKeys error:', e); }
+        }
+        function startSyncPolling() {
+            stopSyncPolling();
+            _progressPollInterval = setInterval(pollProgressKeys, 10000);
+            console.log('▶️ Polling de progreso iniciado (cada 10s)');
+        }
+        function stopSyncPolling() {
+            if (_progressPollInterval) { clearInterval(_progressPollInterval); _progressPollInterval = null; }
+        }
 
         function detachUserDataListener() {
             if (_userDataListener) {
@@ -8272,7 +8695,14 @@ Escribe UN mensaje motivador muy corto (2-3 oraciones máximo) para darle ánimo
             const nutKeys = Object.keys(nutritionRecords || {}).slice(-3);
             const nutSummary = nutKeys.map(k => {
                 const r = nutritionRecords[k];
-                return r && r.analysis ? r.analysis.substring(0, 80) : '';
+                if (!r || !r.analysis) return '';
+                const a = r.analysis;
+                if (typeof a === 'string') return a.substring(0, 80);
+                if (typeof a === 'object') {
+                    // Si es objeto, intentar extraer texto razonable
+                    try { return JSON.stringify(a).substring(0, 80); } catch(e) { return ''; }
+                }
+                return String(a).substring(0, 80);
             }).filter(Boolean).join(' | ');
 
             return {
@@ -8598,6 +9028,150 @@ Escribe exactamente 3-4 oraciones en español, tono cercano (tuteo). Sé MUY esp
             return lookup;
         }
 
+        // Reemplaza UN SOLO ejercicio en el plan semanal usando Claude AI.
+        // dk = dateKey (yyyy-mm-dd), idx = índice dentro del array de ejercicios de ese día.
+        async function swapExerciseWithAI(dk, idx) {
+            try {
+                const dateObj = new Date(dk + 'T00:00:00');
+                const dayKey = DAY_NAMES_MAP[dateObj.getDay()];
+                const dayList = (weeklyPlan && weeklyPlan[dayKey]) || [];
+                const oldEx = dayList[idx];
+                if (!oldEx || !oldEx.name) { alert('No encontré el ejercicio para reemplazar.'); return; }
+
+                // Confirmar (puede haber tocado el botón sin querer)
+                const reason = prompt(`¿Por qué quieres cambiar "${oldEx.name}"?\n(Ej: no tengo el implemento, no me gusta, ya lo hice ayer...)\nDeja vacío para que la IA elija algo equivalente.`, '');
+                if (reason === null) return; // canceló
+
+                if (!_claudeApiKey || !exerciseDatabase) {
+                    // Fallback local: pickeo otro ejercicio del mismo músculo del catálogo que no esté ya en el día
+                    const muscle = oldEx.muscle;
+                    const usedNames = new Set(dayList.map(e => (e && e.name) || ''));
+                    const pool = (exerciseDatabase && exerciseDatabase[muscle] || []).filter(e => !usedNames.has(e.name));
+                    if (pool.length === 0) { alert('No tengo alternativas locales para reemplazar ese ejercicio.'); return; }
+                    const pick = pool[Math.floor(Math.random() * pool.length)];
+                    dayList[idx] = {
+                        ...pick, muscle,
+                        videoIndex: Math.floor(Math.random() * Math.max(1, (pick.videos || []).length)),
+                        _aiSets: oldEx._aiSets || 4,
+                        _aiReps: oldEx._aiReps || 10,
+                        _aiNote: 'Reemplazo local (sin IA disponible).'
+                    };
+                    weeklyPlan[dayKey] = dayList;
+                    saveWeeklyPlan();
+                    renderTodayWorkout(); renderWeeklyWorkouts(); renderCalendar();
+                    return;
+                }
+
+                // Loading overlay con mensaje específico
+                showAILoadingOverlay('IA trabajando para cambiar SOLO ESTE EJERCICIO', `Reemplazando "${oldEx.name}"…`);
+                const overlayFailsafe = setTimeout(() => hideAILoadingOverlay(), 75000);
+
+                const usedNames = dayList.map((e,i) => i !== idx && e && e.name ? `"${e.name}"` : null).filter(Boolean).join(', ');
+                const muscle = oldEx.muscle || 'cualquiera';
+                const muscleList = (exerciseDatabase[muscle] || []).map(e => `"${e.name}" (equipo: ${e.equipment})`).join(', ');
+                const equipList = (athleteEquipment || []).map(e => `${e.name} (${e.type})`).join(', ') || 'equipamiento básico';
+                const objText = (athleteObjectives && athleteObjectives.text) || '';
+
+                const aiPrompt = `Eres un entrenador personal. Reemplaza UN SOLO ejercicio del plan del atleta por uno equivalente del mismo grupo muscular (${muscle}).
+
+Ejercicio a reemplazar: "${oldEx.name}"
+Motivo del usuario: ${reason || '(no especificado — elige algo equivalente que sea variado)'}
+
+Otros ejercicios ya en ese día (NO repetir): ${usedNames || 'ninguno'}
+
+Equipamiento disponible: ${equipList}
+
+Objetivos del atleta: ${objText || 'mejorar condición física'}
+
+Catálogo de ejercicios para ${muscle} (USAR SOLO UNO DE ESTOS):
+${muscleList}
+
+Responde SOLO con JSON válido, sin texto adicional, este formato exacto:
+{"name":"Nombre Exacto del Catálogo","sets":4,"reps":10,"note":"Nota motivadora corta explicando por qué este reemplazo encaja con el motivo del usuario."}`;
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+                let newEx = null;
+                try {
+                    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        signal: controller.signal,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': _claudeApiKey,
+                            'anthropic-version': '2023-06-01',
+                            'anthropic-dangerous-direct-browser-access': 'true'
+                        },
+                        body: JSON.stringify({
+                            model: _claudeModel,
+                            max_tokens: 600,
+                            messages: [{ role: 'user', content: aiPrompt }]
+                        })
+                    });
+                    clearTimeout(timeoutId);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const text = data.content?.[0]?.text?.trim() || '';
+                        const m = text.match(/\{[\s\S]*\}/);
+                        if (m) newEx = JSON.parse(m[0]);
+                    } else {
+                        console.warn('Swap exercise API status:', resp.status);
+                    }
+                } catch(e) {
+                    clearTimeout(timeoutId);
+                    console.warn('swapExerciseWithAI error:', e);
+                }
+
+                clearTimeout(overlayFailsafe);
+                hideAILoadingOverlay();
+
+                if (!newEx || !newEx.name) {
+                    alert('⚠️ La IA no pudo proponer un reemplazo. Probá de nuevo o revisá tu conexión.');
+                    return;
+                }
+
+                const lookup = buildExerciseLookup();
+                const entry = lookup[newEx.name] || lookup[(newEx.name || '').toLowerCase()];
+                if (!entry) {
+                    alert(`La IA propuso "${newEx.name}" pero no está en el catálogo. Intentá de nuevo.`);
+                    return;
+                }
+                dayList[idx] = {
+                    ...entry,
+                    muscle: entry.muscle || oldEx.muscle,
+                    videoIndex: Math.floor(Math.random() * Math.max(1, (entry.videos || []).length)),
+                    _aiSets: parseInt(newEx.sets) || oldEx._aiSets || 4,
+                    _aiReps: parseInt(newEx.reps) || oldEx._aiReps || 10,
+                    _aiNote: newEx.note || ''
+                };
+                weeklyPlan[dayKey] = dayList;
+                saveWeeklyPlan();
+
+                // Actualizar la meta de progreso de ese ejercicio
+                try {
+                    if (!workoutProgress[dk]) workoutProgress[dk] = {};
+                    const existing = workoutProgress[dk][idx] || {};
+                    workoutProgress[dk][idx] = {
+                        ...existing,
+                        goalSets: dayList[idx]._aiSets,
+                        goalReps: dayList[idx]._aiReps,
+                        goalNote: dayList[idx]._aiNote,
+                        _userModified: false,
+                        completed: false,
+                        doneSets: 0, doneReps: 0
+                    };
+                    saveWorkoutProgress();
+                } catch(e) {}
+
+                renderTodayWorkout(); renderWeeklyWorkouts(); renderCalendar();
+                showSyncToast(`🔄 Cambié "${oldEx.name}" → "${entry.name}"`);
+            } catch(err) {
+                console.error('swapExerciseWithAI fatal:', err);
+                hideAILoadingOverlay();
+                alert('⚠️ Error inesperado al cambiar el ejercicio: ' + (err.message || err));
+            }
+        }
+
         async function generateWeekWithClaude(dayTimeData) {
             if (!_claudeApiKey || !exerciseDatabase) return null;
             // Build exercise catalog grouped by muscle
@@ -8791,9 +9365,12 @@ INSTRUCCIONES (CRÍTICAS):
 Responde SOLO con JSON válido, sin texto adicional, exactamente con este formato (NOTA: cada ejercicio debe incluir el campo "muscle"):
 {"plan":{"Lunes":{"minutes":90,"muscles":["biceps","triceps"],"exercises":[{"name":"Curl con Barra","muscle":"biceps","sets":4,"reps":10,"note":"Bíceps con barra para máxima activación. 4 series de 10 reps con el peso que te permita mantener forma perfecta."}]},"Martes":{"minutes":0,"muscles":[],"exercises":[]},"Miércoles":{"minutes":75,"muscles":["chest","back"],"exercises":[{"name":"Press de Banca","muscle":"chest","sets":3,"reps":12,"note":"Pecho con barra, base de fuerza. Controla la bajada en 2 segundos."}]},"Jueves":{"minutes":0,"muscles":[],"exercises":[]},"Viernes":{"minutes":90,"muscles":["legs","shoulders"],"exercises":[{"name":"Sentadilla con Barra","muscle":"legs","sets":4,"reps":8,"note":"Pierna completa. 4 series pesadas, este es el ejercicio rey del día."}]},"Sábado":{"minutes":0,"muscles":[],"exercises":[]},"Domingo":{"minutes":0,"muscles":[],"exercises":[]}}}`;
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 75000);
             try {
                 const resp = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: {
                         'Content-Type': 'application/json',
                         'x-api-key': _claudeApiKey,
@@ -8806,13 +9383,23 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                         messages: [{ role: 'user', content: prompt }]
                     })
                 });
-                if (!resp.ok) { console.warn('Claude plan API status:', resp.status); return null; }
+                clearTimeout(timeoutId);
+                if (!resp.ok) {
+                    const errBody = await resp.text().catch(() => '');
+                    console.warn('Claude plan API status:', resp.status, errBody);
+                    return null;
+                }
                 const data = await resp.json();
                 const text = data.content?.[0]?.text?.trim() || '';
                 const jsonMatch = text.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) { console.warn('No JSON in Claude response'); return null; }
                 return JSON.parse(jsonMatch[0]);
-            } catch(e) { console.warn('generateWeekWithClaude error:', e); return null; }
+            } catch(e) {
+                clearTimeout(timeoutId);
+                if (e.name === 'AbortError') console.warn('Claude API timeout (>75s), cayendo a generador local');
+                else console.warn('generateWeekWithClaude error:', e);
+                return null;
+            }
         }
 
         function applyAIPlanToWeeklyPlan(aiResult, dayTimeData, nextMon) {
@@ -8952,6 +9539,177 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _repTimer: null
         };
 
+        // Picks the session (morning/evening, weights/crossfit) closest to "now".
+        // Returns { type, start, end, idx } or null if no scheduled session exists.
+        function _boxiPickSession(sched, now) {
+            const candidates = [];
+            const add = (start, end, type, idx) => {
+                if (start && end) candidates.push({ type, start, end, idx });
+            };
+            add(sched.weightsStart, sched.weightsEnd, 'weights', 1);
+            add(sched.weightsStart2, sched.weightsEnd2, 'weights', 2);
+            add(sched.crossfitStart, sched.crossfitEnd, 'crossfit', 1);
+            add(sched.crossfitStart2, sched.crossfitEnd2, 'crossfit', 2);
+            if (!candidates.length) return null;
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            let best = null, bestScore = Infinity;
+            for (const c of candidates) {
+                const [sh, sm] = c.start.split(':').map(Number);
+                const [eh, em] = c.end.split(':').map(Number);
+                const startMin = sh * 60 + sm;
+                const endMin = eh * 60 + em;
+                let score;
+                if (nowMin >= startMin && nowMin <= endMin) score = 0;
+                else score = Math.min(Math.abs(nowMin - startMin), Math.abs(nowMin - endMin)) + 1000;
+                if (score < bestScore) { bestScore = score; best = c; }
+            }
+            return best;
+        }
+
+        // Sets schedEnd from a user-chosen duration in minutes, prorated by remaining exercises.
+        // Si el usuario abre BOXI directamente en el ejercicio N>0, la IA descuenta el tiempo
+        // que "deberían" haber consumido los ejercicios anteriores.
+        function _boxiCommitSession(durationMins) {
+            if (!_boxi.workoutStartTime) _boxi.workoutStartTime = new Date();
+            const totalEx = (_boxi.exercises && _boxi.exercises.length) || 1;
+            const startEx = _boxi.exIdx || 0;
+            const remainingRatio = Math.max((totalEx - startEx) / totalEx, 1 / totalEx);
+            const proratedMs = Math.round(durationMins * 60 * 1000 * remainingRatio);
+            _boxi.sessionPlannedMins = durationMins;
+            _boxi.sessionRemainingMins = Math.round(durationMins * remainingRatio);
+            _boxi.sessionDurationMs = proratedMs;
+            _boxi.schedEnd = new Date(_boxi.workoutStartTime.getTime() + proratedMs);
+        }
+
+        function _boxiFmtMins(mins) {
+            if (mins == null || isNaN(mins)) return '';
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            if (h > 0 && m > 0) return h + 'h ' + m + 'min';
+            if (h > 0) return h + 'h';
+            return m + 'min';
+        }
+
+        // Modal de selección de tiempo: SIEMPRE se muestra al abrir BOXI (o al entrar a una nueva sesión de pesas).
+        // Muestra el tiempo original planificado y permite elegir entre presets (30 min, 1h, 1h30), tiempo original,
+        // "lo que queda" (si aún estamos dentro del rango planificado) o un valor custom.
+        // El botón final "RECALCULANDO EN FUNCIÓN DEL TIEMPO" confirma la selección y BOXI ajusta el ritmo.
+        function _boxiAskDuration(originalMins, session, onConfirm) {
+            const prev = document.getElementById('boxiDurationOverlay');
+            if (prev) prev.remove();
+            const overlay = document.createElement('div');
+            overlay.id = 'boxiDurationOverlay';
+            overlay.className = 'time-picker-overlay';
+            const now = new Date();
+            const nowLabel = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+            const origLabel = _boxiFmtMins(originalMins) || '—';
+
+            // ¿Estamos todavía dentro del rango planificado? → ofrecer "lo que queda"
+            let remainingInRangeMins = 0;
+            let inRange = false;
+            if (session && session.start && session.end) {
+                const [sh, sm] = session.start.split(':').map(Number);
+                const [eh, em] = session.end.split(':').map(Number);
+                const startMin = sh * 60 + sm;
+                const endMin = eh * 60 + em;
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                if (nowMin >= startMin && nowMin < endMin) {
+                    inRange = true;
+                    remainingInRangeMins = endMin - nowMin;
+                }
+            }
+
+            // Información del entreno actual
+            const totalEx = (_boxi.exercises && _boxi.exercises.length) || 0;
+            const startEx = (_boxi.exIdx || 0);
+            const exRemaining = Math.max(totalEx - startEx, 0);
+            const sessionInfo = (session && session.start && session.end)
+                ? `Tu plan original era <strong>${origLabel}</strong> (${session.start}–${session.end}).`
+                : `No encuentro un horario planificado para esta sesión.`;
+
+            // Presets disponibles. El "original" sólo aparece si > 0 y distinto de los presets fijos.
+            const presets = [];
+            if (originalMins > 0) presets.push({ mins: originalMins, label: `🎯 Original (${origLabel})`, primary: true });
+            presets.push({ mins: 30, label: '⚡ 30 min' });
+            presets.push({ mins: 60, label: '🕐 1 hora' });
+            presets.push({ mins: 90, label: '🕜 1 hora 30' });
+            if (inRange && remainingInRangeMins >= 5) {
+                presets.push({ mins: remainingInRangeMins, label: `⏳ Lo que queda (${_boxiFmtMins(remainingInRangeMins)})`, hint: true });
+            }
+
+            const presetsHtml = presets.map((p, i) => {
+                const bg = p.primary
+                    ? 'background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;'
+                    : p.hint
+                        ? 'background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;'
+                        : 'background:#f3f4f6;color:#1f2937;border:1.5px solid #d1d5db;';
+                return `<button type="button" data-mins="${p.mins}" class="boxi-dur-preset" style="${bg}padding:12px 8px;border-radius:12px;font-size:0.85rem;font-weight:800;cursor:pointer;border:none;text-align:center;line-height:1.2;">${p.label}</button>`;
+            }).join('');
+
+            const defaultCustomMins = originalMins > 0 ? originalMins : 60;
+
+            overlay.innerHTML = `
+                <div class="time-picker-card" style="text-align:center;max-width:420px;">
+                    <h3 style="font-size:1.05rem;">⏱ ¿Cuánto vas a entrenar?</h3>
+                    <p class="tp-subtitle" style="font-size:0.72rem;line-height:1.45;">${sessionInfo}<br>Ahora son las <strong>${nowLabel}</strong> · Te quedan <strong>${exRemaining}</strong> ejercicio${exRemaining===1?'':'s'} por hacer.</p>
+                    <div id="boxiDurChosenInfo" style="background:#ede9fe;border:1.5px solid #c4b5fd;border-radius:12px;padding:10px;margin:8px 0;font-size:0.78rem;color:#5b21b6;font-weight:700;display:none;"></div>
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
+                        ${presetsHtml}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:12px; padding:8px; margin-top:10px;">
+                        <span style="font-size:0.72rem;font-weight:700;color:#6b7280;padding:0 4px;">Otro:</span>
+                        <input type="number" id="boxiDurInput" min="5" max="240" step="5" value="${defaultCustomMins}" style="flex:1; padding:9px; border:1.5px solid #d1d5db; border-radius:8px; font-size:0.9rem; text-align:center; outline:none;">
+                        <span style="font-weight:700; color:#6b7280; padding-right:4px;font-size:0.8rem;">min</span>
+                        <button type="button" id="boxiDurUseCustom" style="background:#fff;border:1.5px solid #7c3aed;color:#7c3aed;padding:8px 12px;border-radius:8px;font-size:0.78rem;font-weight:800;cursor:pointer;flex:0 0 auto;">Usar</button>
+                    </div>
+                    <button type="button" id="boxiDurRecalc" disabled style="width:100%;margin-top:14px;background:linear-gradient(135deg,#ccff00,#84cc16);color:#1a2e05;border:none;padding:14px;border-radius:14px;font-size:0.95rem;font-weight:900;cursor:pointer;letter-spacing:0.04em;box-shadow:0 4px 14px rgba(204,255,0,0.45);opacity:0.4;transition:opacity 0.2s, transform 0.1s;">
+                        🔄 RECALCULANDO EN FUNCIÓN DEL TIEMPO
+                    </button>
+                    <p style="font-size:0.65rem;color:#9ca3af;margin-top:8px;">BOXI ajustará el ritmo, los descansos y el cronómetro según el tiempo elegido.</p>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            let chosenMins = null;
+            const infoEl = document.getElementById('boxiDurChosenInfo');
+            const recalcBtn = document.getElementById('boxiDurRecalc');
+            const inputEl = document.getElementById('boxiDurInput');
+
+            function setChosen(m, sourceLabel) {
+                chosenMins = m;
+                infoEl.style.display = 'block';
+                infoEl.innerHTML = `Seleccionado: <strong>${_boxiFmtMins(m)}</strong> ${sourceLabel ? `· ${sourceLabel}` : ''}`;
+                recalcBtn.disabled = false;
+                recalcBtn.style.opacity = '1';
+                // Highlight selected preset
+                overlay.querySelectorAll('.boxi-dur-preset').forEach(b => {
+                    b.style.outline = (parseInt(b.dataset.mins,10) === m) ? '3px solid #fbbf24' : 'none';
+                });
+            }
+
+            overlay.querySelectorAll('.boxi-dur-preset').forEach(btn => {
+                btn.onclick = () => {
+                    const m = parseInt(btn.dataset.mins, 10);
+                    if (!isNaN(m) && m > 0) setChosen(m, btn.textContent.trim());
+                };
+            });
+
+            document.getElementById('boxiDurUseCustom').onclick = () => {
+                const val = parseInt(inputEl.value, 10);
+                if (isNaN(val) || val < 5) { alert('Mínimo 5 minutos'); return; }
+                setChosen(val, `${val} min (custom)`);
+            };
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); document.getElementById('boxiDurUseCustom').click(); }
+            });
+
+            recalcBtn.onclick = () => {
+                if (!chosenMins) return;
+                overlay.remove();
+                onConfirm(chosenMins);
+            };
+        }
+
         function boxiShow(dateKey, startIdx) {
             if (!dateKey) return;
             // Reset state
@@ -8963,27 +9721,9 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _boxi.workoutStartTime = new Date();
             if (_boxi._restInterval) { clearInterval(_boxi._restInterval); _boxi._restInterval = null; }
             _boxi.synth && _boxi.synth.cancel();
-
-            // Session duration (countdown from total minutes the user gave themselves)
-            // schedEnd = workoutStartTime + duration. Falls back to weightsEnd as wall-clock if no start configured.
             _boxi.schedEnd = null;
             _boxi.sessionDurationMs = null;
-            try {
-                const sched = (typeof calendarSchedule !== 'undefined' && calendarSchedule[dateKey]) || {};
-                const wStart = sched.weightsStart || sched.crossfitStart;
-                const wEnd = sched.weightsEnd || sched.crossfitEnd;
-                if (wStart && wEnd && typeof calcMinutesBetween === 'function') {
-                    const mins = calcMinutesBetween(wStart, wEnd);
-                    if (mins > 0) {
-                        _boxi.sessionDurationMs = mins * 60 * 1000;
-                        _boxi.schedEnd = new Date(_boxi.workoutStartTime.getTime() + _boxi.sessionDurationMs);
-                    }
-                } else if (wEnd) {
-                    const [h, m] = wEnd.split(':').map(Number);
-                    const end = new Date(); end.setHours(h, m, 0, 0);
-                    if (end > new Date()) _boxi.schedEnd = end;
-                }
-            } catch(e) {}
+            _boxi.sessionPlannedMins = null;
 
             // Get exercises — scan from today forward until we find a day with exercises
             function _loadExForDate(dk) {
@@ -9015,6 +9755,18 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             // Clamp startIdx to valid range
             if (_boxi.exIdx >= _boxi.exercises.length) _boxi.exIdx = 0;
 
+            // ── DURATION LOGIC ────────────────────────────────────────────────
+            // El tiempo que define la sesión es la duración configurada por el usuario
+            // (weightsEnd - weightsStart), NO la hora wall-clock de término. Si el usuario
+            // abre BOXI fuera del horario planificado, le preguntamos si mantiene el tiempo.
+            // Si abre directamente en el ejercicio 2/3/..., prorrateamos por los que quedan.
+            const _sched = (typeof calendarSchedule !== 'undefined' && calendarSchedule[_foundDateKey]) || {};
+            const _session = _boxiPickSession(_sched, _boxi.workoutStartTime);
+            const _originalMins = _session ? calcMinutesBetween(_session.start, _session.end) : 0;
+            // Default: aplicar la duración original (prorrateada por ejercicios restantes).
+            // El modal puede sobrescribirla si el usuario está fuera de horario.
+            if (_session && _originalMins > 0) _boxiCommitSession(_originalMins);
+
             _boxi_showPanel();
             _boxi_setAnim('idle');
 
@@ -9028,15 +9780,34 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                 return;
             }
             document.getElementById('boxiSecBtn').style.display = '';
-            if (_daysAhead > 0) {
-                const nextDateObj = new Date(_foundDateKey + 'T00:00:00');
-                const dayLabel = nextDateObj.toLocaleDateString('es-ES', { weekday: 'long' });
-                _boxi_updateSpeech(`Hoy es descanso 💤 Te muestro los ejercicios del ${dayLabel} para que te vayas preparando.`, `${_boxi.exercises.length} ejercicios · en ${_daysAhead} día${_daysAhead > 1 ? 's' : ''}`);
-                _boxi_updateProgress('');
-                _boxiSpeak(`Hoy descansás. El ${dayLabel} tenés ${_boxi.exercises.length} ejercicios. ¡Mirá lo que viene!`);
-                setTimeout(() => _boxiPresentExercise(), 2500);
+
+            const _continuePresentation = () => {
+                if (_daysAhead > 0) {
+                    const nextDateObj = new Date(_foundDateKey + 'T00:00:00');
+                    const dayLabel = nextDateObj.toLocaleDateString('es-ES', { weekday: 'long' });
+                    _boxi_updateSpeech(`Hoy es descanso 💤 Te muestro los ejercicios del ${dayLabel} para que te vayas preparando.`, `${_boxi.exercises.length} ejercicios · en ${_daysAhead} día${_daysAhead > 1 ? 's' : ''}`);
+                    _boxi_updateProgress('');
+                    _boxiSpeak(`Hoy descansás. El ${dayLabel} tenés ${_boxi.exercises.length} ejercicios. ¡Mirá lo que viene!`);
+                    setTimeout(() => _boxiPresentExercise(), 2500);
+                } else {
+                    setTimeout(() => _boxiPresentExercise(), 600);
+                }
+            };
+
+            // SIEMPRE preguntar la duración al abrir BOXI (excepto en previews de días futuros de descanso).
+            // Si hay 2 sesiones de pesas (Sesión 1 + Sesión 2) la pregunta se repite al volver a abrir BOXI
+            // en un ejercicio de la otra sesión — porque cada apertura dispara este flujo.
+            // El usuario puede confirmar el tiempo original, elegir un preset, "lo que queda" o un custom.
+            const _shouldAsk = (_daysAhead === 0) && _boxi.exercises.length > 0;
+            const _fallbackSession = _session || { start: '', end: '' };
+
+            if (_shouldAsk) {
+                _boxiAskDuration(_originalMins, _fallbackSession, (chosenMins) => {
+                    _boxiCommitSession(chosenMins);
+                    _continuePresentation();
+                });
             } else {
-                setTimeout(() => _boxiPresentExercise(), 600);
+                _continuePresentation();
             }
         }
 
@@ -9064,6 +9835,8 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
         function boxiHide() {
             const panel = document.getElementById('boxiPanel');
             if (panel) panel.classList.remove('boxi-visible');
+            const durOv = document.getElementById('boxiDurationOverlay');
+            if (durOv) durOv.remove();
             _boxi.visible = false;
             _boxi.state = 'idle';
             _boxi._paused = false;
@@ -9080,6 +9853,8 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             if (alertEl) alertEl.classList.remove('boxi-alert-on');
             const navBtn = document.getElementById('navBoxi');
             if (navBtn) navBtn.classList.remove('boxi-active');
+            const banner = document.getElementById('boxiCurrentBanner');
+            if (banner) banner.classList.remove('show');
             _boxiStopSessionClock();
         }
 
@@ -9095,6 +9870,13 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _boxiUpdateBackToTodayBtn();
         }
 
+        // ESC cierra BOXI en laptop (fallback por si el click sobre la X falla en alguna versión de Chrome)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && _boxi && _boxi.visible) {
+                boxiHide();
+            }
+        });
+
         // Live total-session clock (top of Boxi panel)
         // - If schedEnd is set (calendar end time): countdown to end
         // - Otherwise: elapsed time since workout started
@@ -9102,6 +9884,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _boxiStopSessionClock();
             const el = document.getElementById('boxiSessionClock');
             const val = document.getElementById('boxiSessionClockVal');
+            const endAt = document.getElementById('boxiSessionEndAt');
             const lbl = el ? el.querySelector('.lbl') : null;
             if (!el || !val) return;
             el.style.display = 'block';
@@ -9112,10 +9895,16 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                 const ss = totalSec % 60;
                 return (hh > 0 ? String(hh).padStart(2,'0') + ':' : '') + String(mm).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
             }
+            function fmtClock(d) {
+                if (!d) return '';
+                return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+            }
             function tick() {
+                const now = new Date();
                 if (_boxi.schedEnd) {
-                    if (lbl) lbl.textContent = '⏳ TIEMPO TOTAL RESTANTE';
-                    const remMs = _boxi.schedEnd - new Date();
+                    if (lbl) lbl.textContent = '⏳ TIEMPO RESTANTE';
+                    const remMs = _boxi.schedEnd - now;
+                    if (endAt) endAt.textContent = `🏁 Termina a las ${fmtClock(_boxi.schedEnd)} · 🕐 Ahora ${fmtClock(now)}`;
                     if (remMs <= 0) {
                         val.textContent = '00:00';
                         el.classList.remove('warn'); el.classList.add('crit');
@@ -9127,9 +9916,10 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                 } else {
                     if (lbl) lbl.textContent = '⏱ TIEMPO ENTRENANDO';
                     el.classList.remove('warn', 'crit');
-                    const start = _boxi.workoutStartTime || new Date();
-                    const elapsedSec = Math.floor((new Date() - start) / 1000);
+                    const start = _boxi.workoutStartTime || now;
+                    const elapsedSec = Math.floor((now - start) / 1000);
                     val.textContent = fmt(elapsedSec);
+                    if (endAt) endAt.textContent = `🕐 Ahora ${fmtClock(now)}`;
                 }
             }
             tick();
@@ -9171,6 +9961,65 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             if (n) { n.style.display = 'block'; n.textContent = rep; }
             if (l) { l.style.display = 'block'; l.textContent = 'de ' + total + ' reps'; }
             if (r) r.style.display = 'none';
+        }
+
+        function _boxi_updateCurrentBanner() {
+            const banner = document.getElementById('boxiCurrentBanner');
+            const nameEl = document.getElementById('boxiCurrentExName');
+            const metaEl = document.getElementById('boxiCurrentExMeta');
+            const setInd = document.getElementById('boxiSetIndicator');
+            const prevBtn = document.getElementById('boxiPrevSetBtn');
+            const nextBtn = document.getElementById('boxiNextSetBtn');
+            if (!banner) return;
+            if (!_boxi.exercises || _boxi.exercises.length === 0 || _boxi.exIdx >= _boxi.exercises.length) {
+                banner.classList.remove('show');
+                return;
+            }
+            const ex = _boxi.exercises[_boxi.exIdx] || {};
+            const total = _boxi.exercises.length;
+            const sets = _boxi._currentSets || 1;
+            const setNum = (_boxi.setIdx || 0) + 1;
+            if (nameEl) nameEl.textContent = ex.name || 'Ejercicio';
+            if (metaEl) metaEl.textContent = `Ejercicio ${_boxi.exIdx + 1}/${total} · ${sets} series × ${_boxi._currentReps || 0} reps`;
+            if (setInd) setInd.textContent = `Serie ${setNum}/${sets}`;
+            if (prevBtn) prevBtn.disabled = (_boxi.setIdx || 0) <= 0 && _boxi.exIdx <= 0;
+            if (nextBtn) nextBtn.disabled = (_boxi.setIdx || 0) >= sets - 1 && _boxi.exIdx >= total - 1;
+            banner.classList.add('show');
+        }
+
+        function boxiPrevSet() {
+            if (!_boxi.exercises || _boxi.exercises.length === 0) return;
+            if (_boxi._repTimer) { clearTimeout(_boxi._repTimer); _boxi._repTimer = null; }
+            if (_boxi._restInterval) { clearInterval(_boxi._restInterval); _boxi._restInterval = null; }
+            _boxi.synth && _boxi.synth.cancel();
+            if ((_boxi.setIdx || 0) > 0) {
+                _boxi.setIdx--;
+                _boxi.repsDone = 0;
+                _boxi_updateCurrentBanner();
+                _boxiSpeak(`Volvemos a la serie ${_boxi.setIdx + 1}.`, () => _boxiStartSeries(), 1.1);
+            } else if (_boxi.exIdx > 0) {
+                _boxi.exIdx--;
+                _boxi.setIdx = 0;
+                _boxiPresentExercise();
+            }
+        }
+
+        function boxiNextSet() {
+            if (!_boxi.exercises || _boxi.exercises.length === 0) return;
+            if (_boxi._repTimer) { clearTimeout(_boxi._repTimer); _boxi._repTimer = null; }
+            if (_boxi._restInterval) { clearInterval(_boxi._restInterval); _boxi._restInterval = null; }
+            _boxi.synth && _boxi.synth.cancel();
+            const sets = _boxi._currentSets || 1;
+            if ((_boxi.setIdx || 0) < sets - 1) {
+                _boxi.setIdx++;
+                _boxi.repsDone = 0;
+                _boxi_updateCurrentBanner();
+                _boxiSpeak(`Avanzamos a la serie ${_boxi.setIdx + 1}.`, () => _boxiStartSeries(), 1.1);
+            } else if (_boxi.exIdx < _boxi.exercises.length - 1) {
+                _boxi.exIdx++;
+                _boxi.setIdx = 0;
+                _boxiPresentExercise();
+            }
         }
 
         function _boxi_hideRepCounter() {
@@ -9441,6 +10290,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _boxi._currentReps = reps;
             _boxi._currentWeight = weight;
             _boxi._currentName = ex.name || 'Ejercicio';
+            _boxi_updateCurrentBanner();
 
             const total = _boxi.exercises.length;
             const wt = weight ? ` con ${weight} kg` : '';
@@ -9513,6 +10363,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _boxi_showRepCounter(currentRep, reps);
             _boxi_updateProgress(`💪 Serie ${setNum}/${sets} | Ejercicio ${_boxi.exIdx + 1}/${_boxi.exercises.length}`);
             _boxi_updateSpeech(`¡Escucha y sigue el ritmo! 🎯`, `Serie ${setNum} de ${sets}`);
+            _boxi_updateCurrentBanner();
 
             function doRep() {
                 if (_boxi._paused || _boxi.state !== 'counting') return;
@@ -9630,6 +10481,8 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             _boxi_setAnim('celebrate');
             _boxi_hideRepCounter();
             _boxi_hideRestTimer();
+            const banner = document.getElementById('boxiCurrentBanner');
+            if (banner) banner.classList.remove('show');
             _boxi_updateSpeech('¡ENTRENAMIENTO COMPLETADO! 🏆', '¡Eres una máquina!');
             _boxi_updateProgress('');
             _boxiSpeak('¡Felicitaciones! Completaste todo el entrenamiento de hoy. ¡Eres increíble!');
@@ -9777,7 +10630,20 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             </div>
         </div>
         <div id="boxiTimeAlert"></div>
-        <div id="boxiSessionClock"><span class="lbl">⏳ TIEMPO TOTAL RESTANTE</span><span id="boxiSessionClockVal">--:--</span></div>
+        <div id="boxiCurrentBanner">
+            <div class="ex-name" id="boxiCurrentExName">—</div>
+            <div class="ex-meta" id="boxiCurrentExMeta">Ejercicio 0/0 · Serie 0/0</div>
+            <div class="boxi-set-nav">
+                <button type="button" id="boxiPrevSetBtn" onclick="boxiPrevSet()" aria-label="Serie anterior">⏮ Serie ant.</button>
+                <span class="set-label" id="boxiSetIndicator">Serie 1/1</span>
+                <button type="button" id="boxiNextSetBtn" onclick="boxiNextSet()" aria-label="Serie siguiente">Serie sig. ⏭</button>
+            </div>
+        </div>
+        <div id="boxiSessionClock">
+            <span class="lbl">⏳ TIEMPO TOTAL RESTANTE</span>
+            <span id="boxiSessionClockVal">--:--</span>
+            <span id="boxiSessionEndAt" style="display:block;font-size:10px;font-weight:700;color:#ccff00;margin-top:2px;letter-spacing:0.04em;"></span>
+        </div>
         <div id="boxiProgress"></div>
         <div id="boxiCounter">
             <div class="boxi-rep-row">
