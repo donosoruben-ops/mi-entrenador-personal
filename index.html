@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '54';
+    window.APP_VERSION = '55';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -1493,6 +1493,7 @@
                 <span id="syncLastReceivedText" style="font-size:10px;color:#16a34a;margin-left:6px;font-weight:700;"></span>
                 <button onclick="forceSyncFromFirebase(true)" style="font-size:10px;background:#7c3aed;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:6px;cursor:pointer;font-weight:700;">↻ Sincronizar AHORA</button>
                 <button onclick="debugShowFirebaseData()" style="font-size:10px;background:#374151;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:4px;cursor:pointer;font-weight:700;">🔍 Ver datos servidor</button>
+                <button onclick="openBackupManager()" style="font-size:10px;background:#0891b2;color:#fff;border:none;padding:2px 10px;border-radius:8px;margin-left:4px;cursor:pointer;font-weight:700;">🔒 Backups</button>
             </div>
         </div>
 
@@ -7041,6 +7042,39 @@
             _patchedSetItemCount[key] = (_patchedSetItemCount[key] || 0) + 1;
             _lastPatchedSetItemCall = { key, time: Date.now(), valPreview: String(val).substring(0, 60) };
             if (currentUserId && perUserKeys.includes(key)) {
+                // GUARD CRÍTICO: nunca pisar Firebase con un valor vacío para las keys de
+                // progreso. Si por alguna razón se intenta escribir {}/null encima de un
+                // remoto con datos, abortamos la escritura a Firebase y restauramos local
+                // desde remoto. Previene la pérdida de progreso de semana entera por una
+                // race condition en login o sync.
+                if ((key === 'workoutProgress' || key === 'crossfitProgress')) {
+                    const isEmpty = (val === '{}' || val === 'null' || val === '' || val == null);
+                    if (isEmpty && firebaseDB && currentUserId) {
+                        console.warn('🛡️ Intento de escribir ' + key + ' VACÍO — verificando remoto antes de propagar…');
+                        firebaseDB.ref('userData/' + currentUserId + '/' + key).once('value').then(snap => {
+                            const remote = snap.val();
+                            const isRemoteEmpty = !remote || (typeof remote === 'object' && Object.keys(remote).length === 0);
+                            if (!isRemoteEmpty) {
+                                console.error('🛡️ BLOQUEADO: ' + key + ' iba a borrarse, pero remoto tiene datos. RESTAURANDO desde remoto.');
+                                try {
+                                    const parsed = typeof remote === 'string' ? JSON.parse(remote) : remote;
+                                    if (key === 'workoutProgress') workoutProgress = parsed;
+                                    else if (key === 'crossfitProgress') crossfitProgress = parsed;
+                                    originalSetItem(getUserStoragePrefix() + key, fbValToString(remote));
+                                    try { renderTodayWorkout(); } catch(e) {}
+                                    try { renderWeeklyWorkouts(); } catch(e) {}
+                                    showSyncToast('🛡️ Datos preservados (' + key + ' restaurado desde servidor)');
+                                } catch(e) { console.error('Restore desde remote falló:', e); }
+                            } else {
+                                // Remoto también vacío — escritura legítima (ej: reset). Propagar.
+                                firebaseDB.ref('userData/' + currentUserId + '/' + key).set(val).catch(e => console.error('FB write fail:', key, e));
+                            }
+                        }).catch(e => console.warn('Guard check falló:', e));
+                        // Set local prefixed pero NO marcamos timestamp protect — queremos que el listener restaure.
+                        originalSetItem(getUserStoragePrefix() + key, val);
+                        return;
+                    }
+                }
                 originalSetItem(getUserStoragePrefix() + key, val);
                 // Skip Firebase write during sync-triggered reload to avoid echo loop
                 if (_syncReloading) { console.log('⏸️ FB write skipped (syncReloading):', key); return; }
@@ -7132,19 +7166,26 @@
             // Detach any previous listener
             detachUserDataListener();
             try {
-                // STEP 1: Clear ALL old per-user localStorage keys to prevent stale data
                 const prefix = getUserStoragePrefix();
-                perUserKeys.forEach(key => {
-                    try { originalRemoveItem(prefix + key); } catch(e) {}
-                });
-                console.log('🧹 Cleared old localStorage keys for user ' + currentUserId);
 
-                // STEP 2: Load EVERYTHING from Firebase (source of truth)
+                // STEP 1: LEER Firebase PRIMERO. Antes borrábamos localStorage acá, pero si
+                // Firebase fallaba o devolvía null (red lenta, redirect del cache-buster,
+                // etc.), quedábamos con localStorage vacío y un save posterior pisaba
+                // Firebase con {}. Ahora solo tocamos localStorage si la lectura llegó OK.
                 const snap = await firebaseDB.ref('userData/' + currentUserId).once('value');
                 const data = snap.val();
-                let loadedCount = 0;
-                let loadedKeys = [];
-                if (data) {
+
+                if (data === null || data === undefined) {
+                    // Firebase vacío para este user. NO borramos nada local — puede haber datos
+                    // locales aún no sincronizados que se subirán por listener/polling.
+                    console.warn('⚠️ Firebase devolvió null para ' + currentUserId + ' — localStorage local PRESERVADO (posible primer login o problema temporal de red).');
+                    showSyncToast('⚠️ Sin datos en servidor — usando local');
+                } else {
+                    // Tenemos datos válidos del remoto. Ahora sí, sobreescribimos localStorage
+                    // solo PARA LAS KEYS QUE EL REMOTO TRAE. Las que no vengan en el remoto
+                    // conservan su valor local (no las borramos a ciegas).
+                    let loadedCount = 0;
+                    let loadedKeys = [];
                     perUserKeys.forEach(key => {
                         if (data[key] !== undefined && data[key] !== null) {
                             originalSetItem(prefix + key, fbValToString(data[key]));
@@ -7152,8 +7193,21 @@
                             loadedKeys.push(key);
                         }
                     });
+                    console.log('✅ Firebase → localStorage: ' + loadedCount + '/' + perUserKeys.length + ' keys: ' + loadedKeys.join(', '));
+
+                    // BACKUP AUTOMÁTICO: snapshot diario en Firebase de las keys críticas.
+                    // Si algo se rompe, se puede recuperar del backup del día.
+                    try {
+                        const today = new Date();
+                        const dayKey = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+                        ['workoutProgress', 'crossfitProgress'].forEach(k => {
+                            if (data[k] !== undefined && data[k] !== null) {
+                                firebaseDB.ref('userData/' + currentUserId + '/_backups/' + dayKey + '/' + k).set(data[k])
+                                    .catch(e => console.warn('Backup falló para ' + k, e));
+                            }
+                        });
+                    } catch(e) { console.warn('Backup automático falló:', e); }
                 }
-                console.log('✅ Firebase → localStorage: ' + loadedCount + '/' + perUserKeys.length + ' keys: ' + loadedKeys.join(', '));
 
                 // DIRECTLY set global variables from Firebase (bypass localStorage read issues)
                 if (data) {
@@ -7465,6 +7519,63 @@ ${lastCall ? '• Último setItem: ' + lastCall.key + ' hace ' + Math.floor((Dat
             } catch(e) {
                 console.error('debugShowFirebaseData error:', e);
                 alert('Error leyendo Firebase: ' + e.message);
+            }
+        }
+
+        // Lista los snapshots diarios guardados automáticamente bajo
+        // userData/{userId}/_backups/{YYYY-MM-DD}/. Permite restaurar uno.
+        async function openBackupManager() {
+            if (!firebaseDB || !currentUserId) { alert('Sin conexión a Firebase.'); return; }
+            try {
+                const snap = await firebaseDB.ref('userData/' + currentUserId + '/_backups').once('value');
+                const backups = snap.val();
+                if (!backups || typeof backups !== 'object') {
+                    alert('🔒 No hay backups todavía. Se crea uno automáticamente cada vez que la app sincroniza con el servidor exitosamente.');
+                    return;
+                }
+                const days = Object.keys(backups).sort().reverse();
+                if (days.length === 0) { alert('🔒 No hay backups guardados.'); return; }
+                const summary = days.map(d => {
+                    const b = backups[d] || {};
+                    const wpKeys = b.workoutProgress ? Object.keys(typeof b.workoutProgress === 'string' ? JSON.parse(b.workoutProgress) : b.workoutProgress).length : 0;
+                    const cfKeys = b.crossfitProgress ? Object.keys(typeof b.crossfitProgress === 'string' ? JSON.parse(b.crossfitProgress) : b.crossfitProgress).length : 0;
+                    return `${d}: ${wpKeys} días de Pesas, ${cfKeys} días de CrossFit`;
+                }).join('\n');
+                const choice = prompt(
+                    '🔒 BACKUPS DISPONIBLES:\n\n' + summary +
+                    '\n\nEscribí la fecha del backup que querés RESTAURAR (formato YYYY-MM-DD) o cancelá para cerrar.',
+                    days[0]
+                );
+                if (!choice) return;
+                if (!backups[choice]) { alert('No existe backup para esa fecha.'); return; }
+                if (!confirm(`⚠️ ¿RESTAURAR backup del ${choice}?\n\nEsto SOBREESCRIBE el progreso actual con el del backup. La operación es irreversible (pero se hace un backup nuevo antes).`)) return;
+
+                // Backup del estado actual ANTES de restaurar, por si algo sale mal.
+                const preRestoreKey = '_preRestore_' + Date.now();
+                try {
+                    if (workoutProgress) firebaseDB.ref('userData/' + currentUserId + '/_backups/' + preRestoreKey + '/workoutProgress').set(JSON.stringify(workoutProgress));
+                    if (crossfitProgress) firebaseDB.ref('userData/' + currentUserId + '/_backups/' + preRestoreKey + '/crossfitProgress').set(JSON.stringify(crossfitProgress));
+                } catch(e) { console.warn('pre-restore snapshot falló:', e); }
+
+                const chosen = backups[choice];
+                const parseOrUse = (v) => typeof v === 'string' ? JSON.parse(v) : v;
+                if (chosen.workoutProgress) {
+                    const wp = parseOrUse(chosen.workoutProgress);
+                    workoutProgress = wp;
+                    await firebaseDB.ref('userData/' + currentUserId + '/workoutProgress').set(typeof chosen.workoutProgress === 'string' ? chosen.workoutProgress : JSON.stringify(chosen.workoutProgress));
+                    originalSetItem(getUserStoragePrefix() + 'workoutProgress', JSON.stringify(wp));
+                }
+                if (chosen.crossfitProgress) {
+                    const cf = parseOrUse(chosen.crossfitProgress);
+                    crossfitProgress = cf;
+                    await firebaseDB.ref('userData/' + currentUserId + '/crossfitProgress').set(typeof chosen.crossfitProgress === 'string' ? chosen.crossfitProgress : JSON.stringify(chosen.crossfitProgress));
+                    originalSetItem(getUserStoragePrefix() + 'crossfitProgress', JSON.stringify(cf));
+                }
+                try { renderTodayWorkout(); renderWeeklyWorkouts(); renderCalendar(); } catch(e) {}
+                alert('✅ Backup del ' + choice + ' restaurado. El estado anterior quedó guardado como ' + preRestoreKey + ' por si lo necesitás revertir.');
+            } catch(e) {
+                console.error('openBackupManager error:', e);
+                alert('Error: ' + e.message);
             }
         }
 
