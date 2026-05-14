@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '55';
+    window.APP_VERSION = '56';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -2268,14 +2268,24 @@
                     </tr>
                 `;
             }
+            // Si todo el CrossFit del día está al 100% (igual criterio que los ejercicios
+            // de pesas marcados como "hechos"), pintamos la sección de fondo rojo.
+            const cfPct = calcCrossfitPct(dk);
+            const cfDone = cfPct >= 100;
+            const containerCls = cfDone
+                ? 'bg-red-100 border-2 border-red-300 p-3 rounded-lg mt-3'
+                : 'bg-orange-50 border border-orange-200 p-3 rounded-lg mt-3';
+            const titleCls = cfDone ? 'text-red-700' : 'text-orange-700';
+            const headBorderCls = cfDone ? 'border-red-300' : 'border-orange-200';
+            const headTextCls = cfDone ? 'text-red-600' : 'text-orange-600';
             return `
-                <div class="bg-orange-50 border border-orange-200 p-3 rounded-lg mt-3">
-                    <h3 class="text-lg font-semibold text-orange-700 mb-2">
-                        🏋️ CROSSFIT (6:00 - 7:00 PM)
+                <div class="${containerCls}">
+                    <h3 class="text-lg font-semibold ${titleCls} mb-2">
+                        🏋️ CROSSFIT (6:00 - 7:00 PM)${cfDone ? ' <span class="text-xs font-bold ml-1">✔ HECHO</span>' : ''}
                     </h3>
                     <table class="w-full">
                         <thead>
-                            <tr class="text-[9px] text-orange-600 font-semibold border-b border-orange-200">
+                            <tr class="text-[9px] ${headTextCls} font-semibold border-b ${headBorderCls}">
                                 <th class="text-left pb-1">#</th>
                                 <th class="text-left pb-1">Ejercicio</th>
                                 <th class="text-center pb-1">%</th>
@@ -2287,7 +2297,7 @@
                         <tbody>${rows}</tbody>
                     </table>
                     <div id="cf_summary_${dk}" class="mt-3">
-                        ${buildSectionSummaryHtml(calcCrossfitPct(dk), '🏃 CrossFit', 'orange')}
+                        ${buildSectionSummaryHtml(cfPct, '🏃 CrossFit', 'orange')}
                     </div>
                 </div>
             `;
@@ -5818,6 +5828,45 @@
             try { renderWeeklyWorkouts(); } catch (e) {}
         }
 
+        // Deshace el marcado masivo: pone a 0 todos los ejercicios de CrossFit del día
+        // que tengan nombre. Espejo de markCrossfitDayDone.
+        function unmarkCrossfitDayDone(dk) {
+            if (!confirm('↩ ¿DESHACER el CrossFit del día? Los porcentajes vuelven a 0.')) return;
+            if (!crossfitProgress[dk]) return;
+            for (let i = 0; i < 10; i++) {
+                const r = getCrossfitRow(dk, i);
+                if (r.name && r.name.trim() !== '') {
+                    crossfitProgress[dk][i] = { ...r, pct: 0 };
+                }
+            }
+            saveCrossfitProgress();
+            setTimeout(() => saveCrossfitProgress(), 300);
+            try { renderTodayWorkout(); } catch (e) {}
+            try { renderWeeklyWorkouts(); } catch (e) {}
+        }
+
+        // HTML del botón "CROSS FIT HECHO" según estado:
+        //  - pendiente: botón rojo único que marca todo el CrossFit del día al 100%.
+        //  - hecho: par "✔ CROSS FIT HECHO" verde (decorativo) + "↩ DESHACER" naranja.
+        // Mismo patrón que toggleExCompleted / undoExCompleted en los ejercicios.
+        function buildCrossfitDoneButtonHtml(dk, smallVariant) {
+            const isDone = calcCrossfitPct(dk) >= 100;
+            const padY = smallVariant ? 'py-3 px-3' : 'py-3 px-4';
+            const textSize = smallVariant ? 'text-sm' : 'text-base';
+            const subSize = smallVariant ? 'text-[10px]' : 'text-[11px]';
+            const tracking = smallVariant ? 'letter-spacing:0.03em;' : 'letter-spacing:0.04em;';
+            if (isDone) {
+                return `<div class="flex gap-2 mt-3">
+                    <div class="flex-1 bg-green-600 text-white ${padY} rounded-xl font-black ${textSize} text-center select-none" style="${tracking}">
+                        <i class="fas fa-check-circle mr-1"></i>✔ CROSS FIT HECHO
+                        <span class="${subSize} font-bold opacity-90 block mt-1">Marcado al 100%</span>
+                    </div>
+                    <button type="button" onclick="unmarkCrossfitDayDone('${dk}')" class="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white px-3 ${padY.includes('py-3') ? 'py-3' : 'py-2'} rounded-xl font-bold text-xs transition-all flex-shrink-0">↩ DESHACER</button>
+                </div>`;
+            }
+            return `<button type="button" onclick="markCrossfitDayDone('${dk}')" class="w-full mt-3 ${padY} rounded-xl font-black ${textSize} bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-lg transition-all" style="${tracking}">🏃 CROSS FIT HECHO <span style="font-size:${smallVariant ? '10px' : '11px'};font-weight:700;opacity:0.9;display:block;margin-top:2px;">Marcar todo el CrossFit del día al 100%</span></button>`;
+        }
+
         // Marca TODOS los ejercicios de pesas de un día como hechos (kept for compat)
         function markAllDayCompleted(dk) {
             const dayDate = new Date(dk + 'T00:00:00');
@@ -6006,9 +6055,7 @@
                     </div>`;
                     if (cfBlocksRendered === 0) {
                         html += buildCrossfitSection(dk);
-                        // Botón "CROSS FIT HECHO" inmediatamente bajo la tabla de CrossFit y antes
-                        // del próximo bloque (típicamente Pesas Sesión 2).
-                        html += `<button type="button" onclick="markCrossfitDayDone('${dk}')" class="w-full mt-3 py-3 px-4 rounded-xl font-black text-base bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-lg transition-all" style="letter-spacing:0.04em;">🏃 CROSS FIT HECHO <span style="font-size:11px;font-weight:700;opacity:0.9;display:block;margin-top:2px;">Marcar todo el CrossFit del día al 100%</span></button>`;
+                        html += buildCrossfitDoneButtonHtml(dk, false);
                     } else {
                         html += `<p class="text-xs text-gray-500 italic">Continúa con el resto de tu rutina CrossFit en esta segunda sesión.</p>`;
                     }
@@ -6255,9 +6302,7 @@
                         // Render the CrossFit block only on the FIRST session (single block; user may split visually)
                         if (cfBlocksRendered === 0) {
                             html += buildCrossfitSection(dk);
-                            // Botón "CROSS FIT HECHO" inmediatamente bajo la tabla de CrossFit
-                            // y antes del siguiente bloque (típicamente Pesas Sesión 2).
-                            html += `<button type="button" onclick="markCrossfitDayDone('${dk}')" class="w-full mt-3 py-3 px-3 rounded-xl font-black text-sm bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-lg transition-all" style="letter-spacing:0.03em;">🏃 CROSS FIT HECHO <span style="font-size:10px;font-weight:700;opacity:0.9;display:block;margin-top:2px;">Marcar todo el CrossFit del día al 100%</span></button>`;
+                            html += buildCrossfitDoneButtonHtml(dk, true);
                         } else {
                             html += `<p class="text-xs text-gray-500 italic">Continúa con el resto de tu rutina CrossFit en esta segunda sesión.</p>`;
                         }
