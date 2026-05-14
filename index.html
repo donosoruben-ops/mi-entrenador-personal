@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '57';
+    window.APP_VERSION = '58';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -6540,13 +6540,26 @@
         }
 
         function resetCurrentWeekProgress() {
-            const weekKeys = getWeekDateKeys(0); // always reset the actual current week, ignore anchor
+            // SOLO borra el progreso de días FUTUROS (estrictamente posteriores a hoy).
+            // Hoy y los días pasados quedan intactos — el usuario ya hizo esos ejercicios y
+            // no debe perder el registro porque haya regenerado la semana. La nueva
+            // estructura del plan no debe pisar lo ya marcado como hecho.
+            const weekKeys = getWeekDateKeys(0);
+            const todayKey = getDateKey(new Date());
+            const preserved = [];
+            const reseted = [];
             weekKeys.forEach(dk => {
+                if (dk <= todayKey) {
+                    preserved.push(dk);
+                    return; // hoy y pasado: no tocar
+                }
                 if (workoutProgress[dk]) delete workoutProgress[dk];
                 if (crossfitProgress[dk]) delete crossfitProgress[dk];
+                reseted.push(dk);
             });
             saveWorkoutProgress();
             saveCrossfitProgress();
+            console.log('🛡️ Progreso preservado para:', preserved, ' | Reseteado para:', reseted);
         }
 
         function buildAIInsightMessage(summary, nutritionCtx, objectives) {
@@ -6632,7 +6645,7 @@
             if (decisions.length === 0) {
                 decisions.push('Plan variado con rotación de ejercicios para estimulación muscular óptima');
             }
-            decisions.push('✅ Todos los porcentajes de pesas y CrossFit se reiniciaron a 0% para la nueva semana');
+            decisions.push('✅ Porcentajes reiniciados SOLO para días futuros — el progreso de hoy y de días pasados queda intacto');
 
             html += '<ul class="text-[11px] text-gray-700 list-disc ml-3">' + decisions.map(d => '<li>' + d + '</li>').join('') + '</ul>';
             html += '</div>';
@@ -9704,6 +9717,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
 
             // Pre-populate workoutProgress goals for the upcoming week's actual dates
             if (nextMon) {
+                const todayKey = getDateKey(new Date());
                 for (let i = 0; i < 7; i++) {
                     const d = new Date(nextMon);
                     d.setDate(nextMon.getDate() + i);
@@ -9712,6 +9726,12 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                     const dayExercises = newPlan[dayKey];
                     if (!dayExercises || dayExercises.length === 0) continue;
                     const dk = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                    // NO sobrescribir goals de días pasados ni de hoy: el usuario ya entrenó
+                    // contra esos goals, cambiarlos rompería los %, "completado", etc.
+                    if (dk <= todayKey) {
+                        console.log('🛡️ applyAIPlan: preservando goals de ' + dk + ' (hoy o pasado)');
+                        continue;
+                    }
                     if (!workoutProgress[dk]) workoutProgress[dk] = {};
                     dayExercises.forEach((ex, idx) => {
                         const existing = workoutProgress[dk][idx] || {};
