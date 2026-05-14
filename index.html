@@ -8,12 +8,30 @@
     <meta http-equiv="Expires" content="0">
     <title>Mi Entrenador Personal Pro</title>
     <script>
-    // Force cache bust — v49
+    // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
+    // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
+    window.APP_VERSION = '52';
     (function(){
-        var V='50';
-        var u=new URL(window.location.href);
-        if(u.searchParams.get('_v')!==V){
-            u.searchParams.set('_v',V);
+        var V = window.APP_VERSION;
+        var u = new URL(window.location.href);
+        var urlV = u.searchParams.get('_v');
+        var Vn = Number(V), urlVn = Number(urlV);
+
+        // Caso A: la URL pide una versión MAYOR que la del HTML servido.
+        // Significa que el navegador entregó un HTML cacheado viejo. Forzamos fetch
+        // con un nonce de timestamp irrepetible para que el navegador no pueda
+        // resolverlo desde caché (ninguna entrada cacheada tiene este _t).
+        if (urlV && !isNaN(urlVn) && !isNaN(Vn) && urlVn > Vn) {
+            u.searchParams.set('_v', urlV);     // respetamos la versión más nueva pedida
+            u.searchParams.set('_t', Date.now()); // nonce para bypass de caché
+            window.location.replace(u.toString());
+            return;
+        }
+
+        // Caso B: la URL no coincide con la versión del HTML → normalizar al HTML actual.
+        if (urlV !== V) {
+            u.searchParams.set('_v', V);
+            u.searchParams.delete('_t'); // limpieza del nonce una vez sincronizado
             window.location.replace(u.toString());
         }
     })();
@@ -1469,7 +1487,7 @@
             <div id="syncStatusBar" style="display:none;margin-top:6px;">
                 <div>
                     <span id="syncUserId" style="font-size:11px;color:#1f2937;font-family:monospace;font-weight:700;background:#fef3c7;padding:2px 6px;border-radius:4px;"></span>
-                    <span style="font-size:11px;color:#16a34a;font-weight:900;background:#dcfce7;padding:2px 8px;border-radius:4px;margin-left:6px;">v49</span>
+                    <span id="appVersionBadge" style="font-size:11px;color:#16a34a;font-weight:900;background:#dcfce7;padding:2px 8px;border-radius:4px;margin-left:6px;">v?</span>
                 </div>
                 <span id="syncStatusText" style="font-size:10px;color:#6b7280;">🔄 Conectando...</span>
                 <span id="syncLastReceivedText" style="font-size:10px;color:#16a34a;margin-left:6px;font-weight:700;"></span>
@@ -8094,6 +8112,30 @@ ${lastCall ? '• Último setItem: ' + lastCall.key + ' hace ' + Math.floor((Dat
                 if (syncBar) syncBar.style.display = '';
                 const syncIdEl = document.getElementById('syncUserId');
                 if (syncIdEl) syncIdEl.textContent = 'ID: ' + currentUserId;
+                // Badge de versión: SIEMPRE leer de window.APP_VERSION (fuente única, definida arriba en el cache buster)
+                const verBadge = document.getElementById('appVersionBadge');
+                if (verBadge) {
+                    const appV = window.APP_VERSION || '?';
+                    verBadge.textContent = 'v' + appV;
+                    // Self-check: si la URL pide una versión distinta al HTML servido, hay desfase de caché.
+                    // Avisamos visualmente y auto-reload con nonce para forzar fetch fresco.
+                    try {
+                        const urlV = new URL(window.location.href).searchParams.get('_v');
+                        if (urlV && urlV !== appV) {
+                            verBadge.textContent = 'v' + appV + ' ⚠ URL=v' + urlV;
+                            verBadge.style.background = '#fee2e2';
+                            verBadge.style.color = '#dc2626';
+                            verBadge.title = 'Desfase: HTML cacheado v' + appV + ' / URL pide v' + urlV + '. Forzando recarga…';
+                            // Solo auto-reload si la URL pide una versión MAYOR (HTML viejo cacheado).
+                            // Evita loops si por alguna razón el HTML va por delante de la URL.
+                            if (Number(urlV) > Number(appV)) {
+                                const u = new URL(window.location.href);
+                                u.searchParams.set('_t', Date.now());
+                                setTimeout(() => window.location.replace(u.toString()), 800);
+                            }
+                        }
+                    } catch (e) { /* noop */ }
+                }
                 updateSyncStatus('🔄 Cargando datos...');
 
                 // Sync user data from Firebase first
