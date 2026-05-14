@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '56';
+    window.APP_VERSION = '57';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -9896,7 +9896,8 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
             const defaultCustomMins = originalMins > 0 ? originalMins : 60;
 
             overlay.innerHTML = `
-                <div class="time-picker-card" style="text-align:center;max-width:420px;">
+                <div class="time-picker-card" style="text-align:center;max-width:420px;position:relative;">
+                    <button type="button" id="boxiDurClose" aria-label="Cerrar" title="Cerrar sin elegir" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:50%;border:none;background:#f3f4f6;color:#374151;font-size:1rem;font-weight:900;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);">✕</button>
                     <h3 style="font-size:1.05rem;">⏱ ¿Cuánto vas a entrenar?</h3>
                     <p class="tp-subtitle" style="font-size:0.72rem;line-height:1.45;">${sessionInfo}<br>Ahora son las <strong>${nowLabel}</strong> · Te quedan <strong>${exRemaining}</strong> ejercicio${exRemaining===1?'':'s'} por hacer.</p>
                     <div id="boxiDurChosenInfo" style="background:#ede9fe;border:1.5px solid #c4b5fd;border-radius:12px;padding:10px;margin:8px 0;font-size:0.78rem;color:#5b21b6;font-weight:700;display:none;"></div>
@@ -9955,6 +9956,21 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                 overlay.remove();
                 onConfirm(chosenMins);
             };
+
+            // Cerrar sin elegir: ✕ arriba a la derecha, click en el fondo oscuro
+            // (fuera del card) y tecla Escape. Ninguno dispara onConfirm.
+            const closeBtn = document.getElementById('boxiDurClose');
+            if (closeBtn) closeBtn.onclick = () => overlay.remove();
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    overlay.remove();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            document.addEventListener('keydown', escHandler);
         }
 
         function boxiShow(dateKey, startIdx) {
