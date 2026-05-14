@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '58';
+    window.APP_VERSION = '59';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -1997,6 +1997,12 @@
         let nutritionRecords = {};
         let workoutProgress = {};
         let crossfitProgress = {};
+        // Snapshot del plan REAL de cada día (indexado por dateKey YYYY-MM-DD).
+        // Se popula la primera vez que un día se entrena (o antes de regenerar la semana)
+        // para que los días pasados conserven los ejercicios que el usuario hizo,
+        // independientemente de cambios futuros en el template `weeklyPlan` (que está
+        // indexado por nombre de día y se sobreescribe al regenerar).
+        let dailyPlans = {};
 
         function getWorkoutDateKey(date) {
             const d = date || new Date();
@@ -2079,6 +2085,69 @@
                 const s = localStorage.getItem('crossfitProgress');
                 if (s) crossfitProgress = JSON.parse(s);
             } catch(e) { crossfitProgress = {}; }
+        }
+
+        function saveDailyPlans() {
+            try { localStorage.setItem('dailyPlans', JSON.stringify(dailyPlans)); }
+            catch(e) { console.warn('Error guardando dailyPlans:', e.message); }
+        }
+        function loadDailyPlans() {
+            try {
+                const s = localStorage.getItem('dailyPlans');
+                if (s) dailyPlans = JSON.parse(s);
+            } catch(e) { dailyPlans = {}; }
+        }
+
+        // Devuelve el plan REAL de ejercicios para una fecha dada. Si hay un snapshot
+        // congelado en dailyPlans[dk], se devuelve ese (preserva el plan histórico aunque
+        // se regenere el template `weeklyPlan`). Si no, cae al template por día-de-semana.
+        function getPlanForDate(dk) {
+            if (dailyPlans && dailyPlans[dk]) return dailyPlans[dk];
+            const date = parseDateKey(dk);
+            const dayName = DAY_NAMES_MAP[date.getDay()];
+            return (typeof weeklyPlan !== 'undefined') ? weeklyPlan[dayName] : null;
+        }
+
+        // Snapshot lazy: si el día tiene progreso (alguien marcó algo) y no hay snapshot
+        // aún, congela el plan actual de ese día en dailyPlans. Llamado desde
+        // setExerciseProgress y otros writers de progreso.
+        function ensureDailyPlanSnapshot(dk) {
+            if (!dk || dailyPlans[dk]) return;
+            const date = parseDateKey(dk);
+            if (!date || isNaN(date.getTime())) return;
+            const dayName = DAY_NAMES_MAP[date.getDay()];
+            const plan = (typeof weeklyPlan !== 'undefined') ? weeklyPlan[dayName] : null;
+            if (!plan) return;
+            try {
+                dailyPlans[dk] = JSON.parse(JSON.stringify(plan));
+                saveDailyPlans();
+                console.log('📸 Snapshot lazy del plan ' + dk);
+            } catch(e) { console.warn('snapshot lazy fail:', e); }
+        }
+
+        // Snapshot eager de TODOS los días <= hoy de la semana actual.
+        // Llamado ANTES de regenerar la semana para que los días entrenados conserven
+        // sus ejercicios reales aunque el template cambie.
+        function snapshotPastDailyPlans() {
+            const weekKeys = getWeekDateKeys(0);
+            const todayKey = getDateKey(new Date());
+            let snapped = 0;
+            weekKeys.forEach(dk => {
+                if (dk > todayKey) return;
+                if (dailyPlans[dk]) return; // ya hay snapshot, no pisar
+                const date = parseDateKey(dk);
+                const dayName = DAY_NAMES_MAP[date.getDay()];
+                const plan = (typeof weeklyPlan !== 'undefined') ? weeklyPlan[dayName] : null;
+                if (!plan) return;
+                try {
+                    dailyPlans[dk] = JSON.parse(JSON.stringify(plan));
+                    snapped++;
+                } catch(e) {}
+            });
+            if (snapped > 0) {
+                saveDailyPlans();
+                console.log('📸 Snapshot pre-regeneración: ' + snapped + ' días congelados');
+            }
         }
 
         const CF_EXERCISES = [
@@ -2317,6 +2386,10 @@
         function setExerciseProgress(dateKey, idx, data) {
             if (!workoutProgress[dateKey]) workoutProgress[dateKey] = {};
             workoutProgress[dateKey][idx] = data;
+            // Lazy snapshot del plan del día. Si el usuario está marcando progreso,
+            // congelamos el plan vigente para que una regeneración futura no pise
+            // los ejercicios reales que entrenó (workoutProgress se indexa por idx).
+            ensureDailyPlanSnapshot(dateKey);
             saveWorkoutProgress();
         }
 
@@ -3824,6 +3897,11 @@
                 console.warn('Overlay failsafe disparado: cerrando overlay tras 120s');
                 hideAILoadingOverlay();
             }, 120000);
+
+            // Snapshot pre-regeneración: congela el plan actual para los días ya
+            // entrenados (<= hoy) ANTES de que el template `weeklyPlan` cambie.
+            // Así los días pasados conservan los ejercicios reales que el usuario hizo.
+            try { snapshotPastDailyPlans(); } catch(e) { console.warn('snapshotPastDailyPlans falló:', e); }
 
             try {
                 if (_claudeApiKey) {
@@ -5869,9 +5947,7 @@
 
         // Marca TODOS los ejercicios de pesas de un día como hechos (kept for compat)
         function markAllDayCompleted(dk) {
-            const dayDate = new Date(dk + 'T00:00:00');
-            const dayName = DAY_NAMES_MAP[dayDate.getDay()];
-            const dayPlan = (typeof weeklyPlan !== 'undefined') ? weeklyPlan[dayName] : null;
+            const dayPlan = getPlanForDate(dk);
             let exercises = [];
             if (Array.isArray(dayPlan)) {
                 exercises = dayPlan.filter(e => e && e.name);
@@ -5966,12 +6042,11 @@
             const wSessions = daySessions.filter(s => s.type === 'weights');
             const cfSessions = daySessions.filter(s => s.type === 'crossfit');
 
-            // Dynamic plan lookup using day name
+            // Dynamic plan lookup using day name (con preferencia al snapshot histórico de la fecha)
             const MUSCLE_LABELS = { biceps: 'BÍCEPS', triceps: 'TRÍCEPS', chest: 'PECHO', back: 'ESPALDA', legs: 'PIERNAS', shoulders: 'HOMBROS' };
             let dayPlan = null;
             if (schedule.weights) {
-                const dayName = DAY_NAMES_MAP[today];
-                dayPlan = weeklyPlan[dayName];
+                dayPlan = getPlanForDate(dk);
                 if (dayPlan && Array.isArray(dayPlan)) {
                     exercises = dayPlan;
                 } else if (dayPlan && typeof dayPlan === 'object') {
@@ -6073,9 +6148,11 @@
             const weekKeys = getWeekDateKeys();
             const todayKey = getDateKey(new Date());
             const _ML = { biceps: 'BÍCEPS', triceps: 'TRÍCEPS', chest: 'PECHO', back: 'ESPALDA', legs: 'PIERNAS', shoulders: 'HOMBROS' };
-            function _getPlanMap(dow) {
-                const dayName = DAY_NAMES_MAP[dow];
-                const dayPlan = weeklyPlan[dayName];
+            // Plan map por dateKey (no por dow) para respetar snapshots históricos.
+            // Si un día pasado tiene snapshot en dailyPlans, usamos ese plan; si no,
+            // caemos al template `weeklyPlan[dayName]`.
+            function _getPlanMapForDk(dk) {
+                const dayPlan = getPlanForDate(dk);
                 let exercises = [];
                 if (dayPlan && Array.isArray(dayPlan)) exercises = dayPlan;
                 else if (dayPlan && typeof dayPlan === 'object') exercises = Object.values(dayPlan).filter(v => typeof v === 'object' && v.name);
@@ -6084,7 +6161,7 @@
                 return { plan: exercises, label: label };
             }
             const planMap = {};
-            [0,1,2,3,4,5,6].forEach(d => { planMap[d] = _getPlanMap(d); });
+            (weekKeys || []).forEach(dk => { planMap[dk] = _getPlanMapForDk(dk); });
             const dayColors = { 1: 'purple', 2: 'green', 3: 'red', 4: 'yellow', 5: 'indigo', 6: 'green', 0: 'gray' };
             const dayTextColors = { 1: 'text-purple-700', 2: 'text-green-700', 3: 'text-red-700', 4: 'text-yellow-700', 5: 'text-indigo-700', 6: 'text-green-700', 0: 'text-gray-700' };
             // Index 0=Sun..6=Sat for naming
@@ -6136,7 +6213,7 @@
                 const dayName = dayNamesByJsIdx[dayIdx];
                 const titleClass = dayTextColors[dayIdx];
                 const color = dayColors[dayIdx];
-                const pm = planMap[dayIdx];
+                const pm = planMap[dk] || { plan: [], label: 'DESCANSO' };
                 const dateLabel = parseDateKey(dk).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
                 const todayCls = (dk === todayKey) ? ' today-week-card' : '';
                 
@@ -6428,22 +6505,22 @@
 
             if (!weeklyPlan) return summary;
 
-            const planMap = {};
-            [0,1,2,3,4,5,6].forEach(dow => {
-                const dayName = DAY_NAMES_MAP[dow];
-                const dp = weeklyPlan[dayName];
-                if (dp && Array.isArray(dp)) planMap[dow] = dp;
-                else if (dp && typeof dp === 'object') planMap[dow] = Object.values(dp).filter(v => typeof v === 'object' && v.name);
-                else planMap[dow] = [];
+            // Plan por fecha (no por dow) para que los resúmenes históricos usen los
+            // ejercicios REALES que el usuario hizo cada día, no el template actual.
+            const planByDk = {};
+            (weekKeys || []).forEach(dk => {
+                const dp = getPlanForDate(dk);
+                if (dp && Array.isArray(dp)) planByDk[dk] = dp;
+                else if (dp && typeof dp === 'object') planByDk[dk] = Object.values(dp).filter(v => typeof v === 'object' && v.name);
+                else planByDk[dk] = [];
             });
 
             const dayOrder = [1, 2, 3, 4, 5, 6, 0];
             let totalWeightsPct = 0, weightsDays = 0;
 
             for (let i = 0; i < 7; i++) {
-                const dayIdx = dayOrder[i];
                 const dk = weekKeys[i];
-                const exercises = planMap[dayIdx] || [];
+                const exercises = planByDk[dk] || [];
 
                 if (exercises.length > 0) {
                     summary.totalDays++;
@@ -6677,6 +6754,9 @@
         }
 
         function generateNewWeek(dayTimeData) {
+            // Snapshot pre-regeneración: si esta función se llama directamente (fallback
+            // local sin IA, sin pasar por el path que ya snapshotea), congelar igual.
+            try { snapshotPastDailyPlans(); } catch(e) {}
             const summary = collectWeeklySummary();
             const nutritionCtx = getNutritionContext();
             const objectives = athleteObjectives;
@@ -6963,7 +7043,7 @@
         const originalGetItem = localStorage.getItem.bind(localStorage);
         const originalSetItem = localStorage.setItem.bind(localStorage);
         const originalRemoveItem = localStorage.removeItem.bind(localStorage);
-        const perUserKeys = ['weeklyPlan','planDate','weekNumber','workoutProgress','crossfitProgress','nutritionRecords','trainingMode','weeklySchedule','athleteObjectives','athleteVideoLinks','athleteEquipment','calendarSchedule','generatedWeeks','crossfitNextWeek'];
+        const perUserKeys = ['weeklyPlan','planDate','weekNumber','workoutProgress','crossfitProgress','nutritionRecords','trainingMode','weeklySchedule','athleteObjectives','athleteVideoLinks','athleteEquipment','calendarSchedule','generatedWeeks','crossfitNextWeek','dailyPlans'];
 
         // Firebase sync state
         let firebaseDB = null;
@@ -7277,6 +7357,7 @@
                         if (data.weeklyPlan) { const p = parseOrUse(data.weeklyPlan); if (p && typeof p === 'object') weeklyPlan = p; }
                         if (data.workoutProgress) { const p = parseOrUse(data.workoutProgress); if (p && typeof p === 'object') workoutProgress = p; }
                         if (data.crossfitProgress) { const p = parseOrUse(data.crossfitProgress); if (p && typeof p === 'object') crossfitProgress = p; }
+                        if (data.dailyPlans) { const p = parseOrUse(data.dailyPlans); if (p && typeof p === 'object') dailyPlans = p; }
                         if (data.trainingMode && typeof data.trainingMode === 'string') trainingMode = data.trainingMode;
                         if (data.nutritionRecords) { const p = parseOrUse(data.nutritionRecords); if (p && typeof p === 'object') nutritionRecords = p; }
                         if (data.athleteObjectives) { const p = parseOrUse(data.athleteObjectives); if (p && typeof p === 'object') athleteObjectives = p; }
@@ -7481,6 +7562,7 @@
                         if (data.weeklyPlan && !isKeyLocallyProtected('weeklyPlan')) { const p = parseOrUse(data.weeklyPlan); if (p && typeof p === 'object') weeklyPlan = p; }
                         if (data.workoutProgress && !isKeyLocallyProtected('workoutProgress')) { const p = parseOrUse(data.workoutProgress); if (p && typeof p === 'object') workoutProgress = p; }
                         if (data.crossfitProgress && !isKeyLocallyProtected('crossfitProgress')) { const p = parseOrUse(data.crossfitProgress); if (p && typeof p === 'object') crossfitProgress = p; }
+                        if (data.dailyPlans && !isKeyLocallyProtected('dailyPlans')) { const p = parseOrUse(data.dailyPlans); if (p && typeof p === 'object') dailyPlans = p; }
                         if (data.trainingMode && !isKeyLocallyProtected('trainingMode') && typeof data.trainingMode === 'string') trainingMode = data.trainingMode;
                         if (data.nutritionRecords && !isKeyLocallyProtected('nutritionRecords')) { const p = parseOrUse(data.nutritionRecords); if (p && typeof p === 'object') nutritionRecords = p; }
                         if (data.athleteObjectives && !isKeyLocallyProtected('athleteObjectives')) { const p = parseOrUse(data.athleteObjectives); if (p && typeof p === 'object') athleteObjectives = p; }
@@ -8388,6 +8470,7 @@ ${lastCall ? '• Último setItem: ' + lastCall.key + ' hace ' + Math.floor((Dat
                 loadWeekNumber();
                 loadWorkoutProgress();
                 loadCrossfitProgress();
+                loadDailyPlans();
                 loadNutritionData();
                 setTrainingMode(trainingMode);
                 renderWeeklyDays();
@@ -10010,7 +10093,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
 
             // Get exercises — scan from today forward until we find a day with exercises
             function _loadExForDate(dk) {
-                const dp = (typeof weeklyPlan !== 'undefined') ? weeklyPlan[DAY_NAMES_MAP[new Date(dk + 'T00:00:00').getDay()]] : null;
+                const dp = getPlanForDate(dk);
                 if (!dp) return [];
                 if (Array.isArray(dp)) return dp.filter(e => e && e.name);
                 if (typeof dp === 'object') return Object.values(dp).filter(v => typeof v === 'object' && v && v.name);
