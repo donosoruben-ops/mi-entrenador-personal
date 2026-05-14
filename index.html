@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '59';
+    window.APP_VERSION = '60';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -10270,7 +10270,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                 if (_boxi.schedEnd) {
                     if (lbl) lbl.textContent = '⏳ TIEMPO RESTANTE';
                     const remMs = _boxi.schedEnd - now;
-                    if (endAt) endAt.textContent = `🏁 Termina a las ${fmtClock(_boxi.schedEnd)} · 🕐 Ahora ${fmtClock(now)}`;
+                    if (endAt) endAt.innerHTML = `🕐 AHORA ES: <strong>${fmtClock(now)}</strong> hrs<br>🏁 TERMINAMOS A LAS: <strong>${fmtClock(_boxi.schedEnd)}</strong> hrs`;
                     if (remMs <= 0) {
                         val.textContent = '00:00';
                         el.classList.remove('warn'); el.classList.add('crit');
@@ -10285,7 +10285,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
                     const start = _boxi.workoutStartTime || now;
                     const elapsedSec = Math.floor((now - start) / 1000);
                     val.textContent = fmt(elapsedSec);
-                    if (endAt) endAt.textContent = `🕐 Ahora ${fmtClock(now)}`;
+                    if (endAt) endAt.innerHTML = `🕐 AHORA ES: <strong>${fmtClock(now)}</strong> hrs`;
                 }
             }
             tick();
@@ -11008,7 +11008,7 @@ Responde SOLO con JSON válido, sin texto adicional, exactamente con este format
         <div id="boxiSessionClock">
             <span class="lbl">⏳ TIEMPO TOTAL RESTANTE</span>
             <span id="boxiSessionClockVal">--:--</span>
-            <span id="boxiSessionEndAt" style="display:block;font-size:10px;font-weight:700;color:#ccff00;margin-top:2px;letter-spacing:0.04em;"></span>
+            <span id="boxiSessionEndAt" style="display:block;font-size:13px;font-weight:800;color:#ccff00;margin-top:4px;letter-spacing:0.03em;line-height:1.35;"></span>
         </div>
         <div id="boxiProgress"></div>
         <div id="boxiCounter">
