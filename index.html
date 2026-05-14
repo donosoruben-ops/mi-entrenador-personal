@@ -10,7 +10,7 @@
     <script>
     // ⚠️ ÚNICA fuente de verdad de la versión de la app. Bumpear SOLO aquí en cada deploy.
     // El badge visible en el header lee window.APP_VERSION automáticamente — no hardcodear v## en otro lado.
-    window.APP_VERSION = '53';
+    window.APP_VERSION = '54';
     (function(){
         var V = window.APP_VERSION;
         var u = new URL(window.location.href);
@@ -3720,19 +3720,27 @@
                 const fullSched = calendarSchedule[dk] || {};
                 const dow = d.getDay();
 
-                let wMins = 90, cfMins = 60; // defaults
+                // Minutos por sesión (no sumados). La IA debe ver el tiempo DE CADA sesión por separado
+                // para distribuir ejercicios coherentemente; mezclar las dos en un solo total la hacía
+                // creer que cabían en una misma sesión.
+                let wMins1 = 0, wMins2 = 0, cfMins1 = 0, cfMins2 = 0;
                 if (fullSched.weightsStart && fullSched.weightsEnd) {
-                    wMins = calcMinutesBetween(fullSched.weightsStart, fullSched.weightsEnd);
+                    wMins1 = calcMinutesBetween(fullSched.weightsStart, fullSched.weightsEnd);
                 }
                 if (fullSched.weightsStart2 && fullSched.weightsEnd2) {
-                    wMins += calcMinutesBetween(fullSched.weightsStart2, fullSched.weightsEnd2);
+                    wMins2 = calcMinutesBetween(fullSched.weightsStart2, fullSched.weightsEnd2);
                 }
                 if (fullSched.crossfitStart && fullSched.crossfitEnd) {
-                    cfMins = calcMinutesBetween(fullSched.crossfitStart, fullSched.crossfitEnd);
+                    cfMins1 = calcMinutesBetween(fullSched.crossfitStart, fullSched.crossfitEnd);
                 }
                 if (fullSched.crossfitStart2 && fullSched.crossfitEnd2) {
-                    cfMins += calcMinutesBetween(fullSched.crossfitStart2, fullSched.crossfitEnd2);
+                    cfMins2 = calcMinutesBetween(fullSched.crossfitStart2, fullSched.crossfitEnd2);
                 }
+                // Defaults solo si no hay horarios configurados
+                let wMins = wMins1 + wMins2;
+                if (wMins === 0) wMins = 90;
+                let cfMins = cfMins1 + cfMins2;
+                if (cfMins === 0) cfMins = 60;
 
                 const wTime1 = fullSched.weightsStart ? `${fullSched.weightsStart}-${fullSched.weightsEnd}` : '';
                 const wTime2 = fullSched.weightsStart2 ? `${fullSched.weightsStart2}-${fullSched.weightsEnd2}` : '';
@@ -3747,9 +3755,15 @@
                 dayTimeData[dow] = {
                     weights: sched.weights,
                     crossfit: sched.crossfit,
-                    weightsMinutes: wMins,
+                    weightsMinutes: wMins,           // suma (compat: usada como _minutes y fallback genérico)
+                    weightsMinutes1: wMins1,         // sesión 1 (independiente)
+                    weightsMinutes2: wMins2,         // sesión 2 (independiente; 0 si no hay)
                     crossfitMinutes: cfMins,
+                    crossfitMinutes1: cfMins1,
+                    crossfitMinutes2: cfMins2,
                     weightsTime: wTime2 ? `${wTime1} y ${wTime2}` : wTime1,
+                    weightsTime1: wTime1,
+                    weightsTime2: wTime2,
                     crossfitTime: cfTime2 ? `${cfTime1} y ${cfTime2}` : cfTime1,
                     weightsSessions: wTime2 ? 2 : (wTime1 ? 1 : 0),
                     crossfitSessions: cfTime2 ? 2 : (cfTime1 ? 1 : 0),
@@ -5588,7 +5602,9 @@
             updateDaySummary(dk);
         }
 
-        function renderExerciseCard(exercise, idx, sets, duration, colorClass = 'purple', dateKey = null) {
+        // `displayNum` (opcional, 1-based) sobrescribe la numeración visible — útil para que
+        // cada sesión de pesas empiece desde 1 aunque `idx` sea global al día.
+        function renderExerciseCard(exercise, idx, sets, duration, colorClass = 'purple', dateKey = null, displayNum = null) {
             const dk = dateKey || getWorkoutDateKey();
             const prog = getExerciseProgress(dk, idx);
             storeExerciseNameInProgress(dk, idx, exercise.name || exercise);
@@ -5657,7 +5673,7 @@
                     <div class="flex justify-between items-start gap-2">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
-                                <h4 class="font-bold text-gray-800 text-sm">${idx + 1}. ${exercise.name}</h4>
+                                <h4 class="font-bold text-gray-800 text-sm">${displayNum != null ? displayNum : (idx + 1)}. ${exercise.name}</h4>
                                 ${mediaBlock}
                             </div>
                             <p class="text-xs ${textColorClass}"><i class="fas fa-dumbbell mr-1"></i>${exercise.equipment}</p>
@@ -5966,8 +5982,8 @@
                     if (sessionItems.length > 0) {
                         const sets = enrichedExercises.length > 5 ? '4x10' : '3x10';
                         const duration = enrichedExercises.length > 5 ? '~12 min' : '~10 min';
-                        sessionItems.forEach(({ ex, idx }) => {
-                            const card = renderExerciseCard(ex, idx, sets, duration, 'purple', dk);
+                        sessionItems.forEach(({ ex, idx }, sessionPos) => {
+                            const card = renderExerciseCard(ex, idx, sets, duration, 'purple', dk, sessionPos + 1);
                             html += `<div class="ex-remove-wrap mb-2"><button class="ex-remove-btn" title="Quitar de esta sesión" onclick="event.stopPropagation();removeWeightsExFromSession('${dk}',${s.sessionIdx},${idx})">✕</button>${card}</div>`;
                         });
                     } else {
@@ -6212,8 +6228,8 @@
                         if (sessionItems.length > 0) {
                             const sets = enrichedPlan.length > 5 ? '4x10' : '3x10';
                             const duration = enrichedPlan.length > 5 ? '~12 min' : '~10 min';
-                            sessionItems.forEach(({ ex, idx }) => {
-                                const card = renderExerciseCard(ex, idx, sets, duration, color, dk);
+                            sessionItems.forEach(({ ex, idx }, sessionPos) => {
+                                const card = renderExerciseCard(ex, idx, sets, duration, color, dk, sessionPos + 1);
                                 html += `<div class="ex-remove-wrap mb-2"><button class="ex-remove-btn" title="Quitar de esta sesión" onclick="event.stopPropagation();removeWeightsExFromSession('${dk}',${s.sessionIdx},${idx})">✕</button>${card}</div>`;
                             });
                         } else {
@@ -9259,15 +9275,19 @@ Responde SOLO con JSON válido, sin texto adicional, este formato exacto:
                 if (info.weights) {
                     const m1 = (info.muscles || []).map(k => MUSCLE_LABELS_ES[k] || k);
                     const m2 = (info.muscles2 || []).map(k => MUSCLE_LABELS_ES[k] || k);
-                    const horario = info.weightsTime ? ` [Horario: ${info.weightsTime}]` : '';
-                    let mtxt = '';
+                    let pesasTxt;
                     if (info.weightsSessions === 2) {
-                        mtxt = ` — Sesión 1 grupos: [${m1.join(', ') || 'no especificados'}]; Sesión 2 grupos: [${m2.join(', ') || 'no especificados'}]`;
+                        // Sesiones independientes: tiempo POR SESIÓN, no sumado. Cada sesión es un bloque
+                        // separado en su propio horario; los ejercicios deben caber en su sesión sola.
+                        const t1 = info.weightsTime1 ? ` ${info.weightsTime1}` : '';
+                        const t2 = info.weightsTime2 ? ` ${info.weightsTime2}` : '';
+                        pesasTxt = `Pesas en 2 sesiones SEPARADAS (NO sumar tiempo): Sesión 1 = ${info.weightsMinutes1} min${t1} con grupos [${m1.join(', ') || 'no especificados'}]; Sesión 2 = ${info.weightsMinutes2} min${t2} con grupos [${m2.join(', ') || 'no especificados'}]. Los ejercicios de cada sesión deben caber en SU tiempo, no en el total.`;
                     } else {
-                        mtxt = ` — grupos musculares: [${m1.join(', ') || 'no especificados'}]`;
+                        const horario = info.weightsTime ? ` [Horario: ${info.weightsTime}]` : '';
+                        pesasTxt = `Pesas ${info.weightsMinutes} min${horario} — grupos musculares: [${m1.join(', ') || 'no especificados'}]`;
                     }
                     const cfPart = info.crossfit ? ` + CrossFit ${info.crossfitMinutes} min${info.crossfitTime ? ' ('+info.crossfitTime+')' : ''}` : '';
-                    return `${n}: Pesas ${info.weightsMinutes} min${info.weightsSessions === 2 ? ' (en 2 sesiones)' : ''}${horario}${mtxt}${cfPart}`;
+                    return `${n}: ${pesasTxt}${cfPart}`;
                 }
                 if (info.crossfit) {
                     const horarioCF = info.crossfitTime ? ` [Horario: ${info.crossfitTime}]` : '';
